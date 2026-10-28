@@ -125,6 +125,11 @@ cd ..
 
 ### 5. Configure optional environment variables
 
+The main application uses one global environment file at the project root:
+`/path/to/bookleaf/.env`. Create this file beside the root `package.json`, not
+inside `backend/` or `frontend/`. The backend loads this root file when the
+application starts.
+
 Create a file named `.env` in the project root if you want to customise the local
 configuration or enable Gemini:
 
@@ -143,6 +148,29 @@ DB_PATH=./database/bookleaf.db
 Do not commit a real API key or production secret to the repository. If no `.env`
 file is created, the backend uses port `5001`, the checked-in SQLite database path,
 and the local fallback AI configuration.
+
+#### Separate environment file for `aiml/`
+
+If you run the standalone AI test script from the `aiml/` directory, the
+environment file must be created inside that directory:
+`/path/to/bookleaf/aiml/.env`.
+
+Use the same Gemini variables in `aiml/.env`:
+
+```dotenv
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+This `aiml/.env` file is separate from the global project-root `.env`. To use
+`aiml/.env`, run the standalone AI test from inside the `aiml/` directory:
+
+```bash
+cd aiml
+node test-cases.js
+```
+
+Do not commit either `.env` file or any API key.
 
 ## Running the application
 
