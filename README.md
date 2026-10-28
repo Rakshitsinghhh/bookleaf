@@ -1,230 +1,429 @@
 # BookLeaf Publishing — Author Support & Communication Portal
 
-A full-stack, enterprise-grade Author Support & Communication Portal designed for **BookLeaf Publishing**. Powered by AI-assisted response generation, real-time ticket streaming, and operations management.
+BookLeaf is a full-stack author support portal created for the BookLeaf Full-Stack
+Developer Technical Assessment. It gives authors a place to view their books and
+royalty information, submit support queries, upload evidence, and follow ticket
+updates. It also gives operations staff a ticket queue with filtering, AI-assisted
+classification, response drafts, assignment, internal notes, and real-time updates.
 
-Built for the **BookLeaf Full-Stack Developer Technical Assessment**.
+The application has three parts:
 
----
+- **Frontend:** Next.js and React author and operations portals.
+- **Backend:** Express REST API with JWT authentication, SQLite persistence, file
+  uploads, Swagger documentation, and Server-Sent Events (SSE).
+- **AI support:** Gemini-powered ticket analysis with a local knowledge-grounded
+  fallback so the application can still be demonstrated without an API key.
 
-## 🌟 Key Features
+## Features
 
-### 1. Author-Facing Portal
-- **Email Authentication & 1-Click Role Switcher:** Pre-loaded with 10 authors and 2 operations admins from the official assessment dataset.
-- **My Books & Royalty Intelligence:**
-  - Complete catalog breakdown: Title, ISBN, Genre, Publication Date, Status, MRP, Total Copies Sold, Lifetime Royalty Earned (80% net profit), Royalty Paid, and Pending Royalty.
-  - **Graceful Handling of Edge Cases:**
-    - Titles in production (*Midnight in Mysore*, *Raising Roots*) with visual step-by-step pipeline tracking (Manuscript → Editing → Cover Design → Typesetting → Proofreading → ISBN → Printing → Distribution → Published).
-    - Rollover alerts for balances below the ₹1,000 minimum payout threshold.
-    - Zero payout and pending status badges.
-- **Submit a Support Query:**
-  - Dropdown selecting specific published title or General/Account level.
-  - Subject and detailed description with real-time AI auto-classification.
-  - File attachment support for printing defect photos and verification receipts.
-- **My Tickets & Real-Time Sync:**
-  - Live ticket status tracking (Open, In Progress, Resolved, Closed).
-  - Real-time conversation thread: admin responses stream instantly to the author viewport without requiring a page refresh.
+### Author portal
 
-### 2. Admin Operations Portal
-- **Triage Ticket Queue:**
-  - Multi-faceted filtering by Status, Category, Priority, and Date sorting.
-  - Urgency indicators prioritizing Critical and oldest unresolved SLA items.
-  - Full-text search across author names, book titles, ticket IDs, and subjects.
-- **AI-Powered Auto-Classification:**
-  - Automatically categorizes tickets into the 6 official BookLeaf categories:
-    1. *Royalty & Payments*
-    2. *ISBN & Metadata Issues*
-    3. *Printing & Quality*
-    4. *Distribution & Availability*
-    5. *Book Status & Production Updates*
-    6. *General Inquiry*
-  - **Admin Override:** Admins can instantly re-classify tickets if needed.
-- **AI-Generated Priority Score:**
-  - Evaluates urgency (Critical, High, Medium, Low) based on query context (e.g. 6-month royalty delay = Critical, ISBN mismatch = High).
-  - **Admin Override:** Admins can override priority score with 1 click.
-- **AI-Drafted Responses Grounded in Knowledge Base:**
-  - Pre-drafts empathetic, policy-accurate responses adhering to BookLeaf tone guidelines (acknowledges concern, includes verified dates and numbers, provides 48-hour resolution targets, avoids corporate deflection).
-  - Admin can inspect, freely edit, or regenerate the draft before dispatching to the author.
-- **Confidential Internal Notes:**
-  - Operations team can document private notes, bank verification checks, and printer escalations strictly hidden from the author.
-- **Ticket Assignment:**
-  - Assign tickets across operations leads (*Ankit Verma*, *Pooja Iyer*).
+- Sign in using one of the seeded author accounts.
+- View published and in-production books, ISBNs, publication status, sales, and
+  royalty summaries.
+- See production stages for books that are not yet published.
+- Submit a query about a selected book or a general account question.
+- Attach an image or PDF to a ticket, for example evidence of a printing defect.
+- View ticket status and the complete conversation thread.
+- Receive ticket messages and status changes through the live SSE connection without
+  refreshing the page.
 
----
+### Operations portal
 
-## 🎨 Theme & Brand Aesthetics
+- Sign in as an operations administrator.
+- Search and filter tickets by status, category, priority, date, author, book, or
+  ticket ID.
+- Review AI-generated category, priority, explanation, recommended action, and
+  author-facing reply draft.
+- Edit or regenerate a draft before sending it.
+- Override the category and priority when the AI classification is not appropriate.
+- Assign tickets to operations team members.
+- Add private internal notes that are never shown to authors.
+- Monitor ticket and message updates in real time.
 
-Matching BookLeaf Publishing (`bookleafpub.in`):
-- **Signature Palette:** Warm Coral / Rose Red (`#eb586f`, `#f47285`), blush rose accents (`#fff1f3`, `#fecdd3`), and slate darks (`#1e293b`).
-- **Dark & Light Mode Support:** 1-click animated toggle (Sun / Moon) in the top navbar. Features a bespoke obsidian navy (`#0a0e17`) dark palette, deep slate glassmorphism surfaces (`#121826`), glowing coral highlights, and saved localStorage theme persistence.
-- **Brand Mark:** Iconic BookLeaf Coral square with white `/` brand typography.
-- **Typography:** `Outfit` for geometric headings and `Inter` for clean data legibility.
-- **UI Elements:** Smooth elevation cards, pulsing live sync badges, and interactive feedback toasts.
+### Assignment policies represented in the application
 
----
+- Royalties are calculated quarterly and paid within 45 days after the quarter ends.
+- The minimum payout is INR 1,000; smaller balances roll over.
+- Printing normally takes 5–7 business days. Verified printing defects qualify for
+  a free reprint.
+- New listings generally appear within 7–10 business days after publication.
+- Stock synchronisation issues may take 24–48 hours after re-sync.
+- Metadata changes normally take 3–5 business days.
+- ISBN-related tickets are treated as high-priority production escalations.
 
-## 🏗️ Architecture & Project Structure
+## Technology
 
-```
-bookleaf/
-├── backend/                        # Express REST API Server
-│   ├── src/
-│   │   ├── config/index.js         # Environment & server config
-│   │   ├── database/
-│   │   │   ├── db.js               # Node 24 native node:sqlite database engine
-│   │   │   └── seed.js             # Seeder for sample authors, books & tickets
-│   │   ├── middleware/
-│   │   │   └── auth.js             # JWT authentication & RBAC middleware
-│   │   ├── routes/
-│   │   │   ├── authRoutes.js       # Login, profile, and test accounts
-│   │   │   ├── bookRoutes.js       # Author catalog and royalty summaries
-│   │   │   ├── ticketRoutes.js     # Ticket CRUD, replies, and status updates
-│   │   │   └── adminRoutes.js      # Ticket queue, overrides, draft regeneration
-│   │   ├── services/
-│   │   │   ├── aiService.js        # Gemini AI integration with fallback engine
-│   │   │   ├── knowledgeBase.js    # BookLeaf knowledge base & context retriever
-│   │   │   └── sseService.js       # Server-Sent Events real-time sync
-│   │   └── server.js               # Express application entrypoint
-│   └── package.json
-├── frontend/                       # Next.js 15 (React 19) Application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.js           # Root layout with fonts & metadata
-│   │   │   ├── globals.css         # BookLeaf design system & brand tokens
-│   │   │   └── page.js             # Dynamic portal container
-│   │   ├── components/
-│   │   │   ├── Navbar.js           # Brand header, role switcher & sync status
-│   │   │   ├── AuthorPortal/
-│   │   │   │   ├── MyBooks.js      # Catalog & royalty financials
-│   │   │   │   ├── SubmitTicket.js # Support ticket query form
-│   │   │   │   └── MyTickets.js    # Ticket tracking & real-time thread
-│   │   │   └── AdminPortal/
-│   │   │       ├── TicketQueue.js  # Filterable queue & analytics
-│   │   │       └── TicketWorkbench.js # AI draft editor & internal notes
-│   │   ├── context/
-│   │   │   ├── AuthContext.js      # User session & 1-click test switcher
-│   │   │   └── RealtimeContext.js  # Server-Sent Events client listener
-│   │   └── services/api.js         # REST API client
-│   └── package.json
-├── database/                       # Database Resources
-│   ├── schema.sql                  # Relational database schema
-│   ├── bookleaf_sample_data.json   # Assessment dataset (10 authors, 18 books)
-│   └── bookleaf.db                 # SQLite database file
-├── package.json                    # Root package with concurrently runner
-├── WRITEUP.md                      # Engineering approach & production roadmap
-└── README.md                       # Comprehensive project documentation
-```
+- Node.js 24 or later
+- Express 4
+- Next.js 16 and React 19
+- SQLite through Node's built-in `node:sqlite` API
+- JWT and bcryptjs authentication
+- Gemini API through `@google/genai` (optional for local demonstration)
+- Server-Sent Events for real-time updates
 
----
+## Prerequisites
 
-## 🚀 Setup & Local Execution
+Install the following before starting:
 
-### Prerequisites
-- **Node.js**: v20 or v24 (Tested and verified on Node v24.19.0)
-- **npm** or **yarn**
+1. **Node.js 24 or later.** This is required because the backend imports
+   `DatabaseSync` from `node:sqlite`. Node 20 is not sufficient for this project.
+2. **npm**, which is included with Node.js.
+3. A modern browser such as Chrome, Edge, or Firefox.
+4. A Gemini API key only if you want to use live Gemini classification and draft
+   generation. The local fallback works without one.
 
-### Quick Start (Single Command)
-
-From the project root directory:
+Verify the installed versions:
 
 ```bash
-# 1. Install root dependencies
-npm install
+node --version
+npm --version
+```
 
-# 2. Run both Backend API and Frontend concurrently
+## Installation
+
+### 1. Open the project directory
+
+Clone or copy the repository, then change into its root directory:
+
+```bash
+cd /path/to/bookleaf
+```
+
+The root directory is the directory containing `package.json`, `backend/`, and
+`frontend/`.
+
+### 2. Install root dependencies
+
+The root package contains the development launcher, database utilities, and AI test
+script:
+
+```bash
+npm install
+```
+
+### 3. Install backend dependencies
+
+The backend has its own `package.json`, including Express, file-upload, and Swagger
+packages:
+
+```bash
+cd backend
+npm install
+cd ..
+```
+
+### 4. Install frontend dependencies
+
+The frontend is a separate Next.js package:
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### 5. Configure optional environment variables
+
+Create a file named `.env` in the project root if you want to customise the local
+configuration or enable Gemini:
+
+```dotenv
+# Optional: enable live Gemini analysis. Leave blank to use the local fallback.
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+
+# Optional local overrides
+PORT=5001
+CLIENT_URL=http://localhost:3000
+JWT_SECRET=replace-this-with-a-local-development-secret
+DB_PATH=./database/bookleaf.db
+```
+
+Do not commit a real API key or production secret to the repository. If no `.env`
+file is created, the backend uses port `5001`, the checked-in SQLite database path,
+and the local fallback AI configuration.
+
+## Running the application
+
+### Recommended method: start the complete application
+
+From the project root, run:
+
+```bash
 npm run dev
 ```
 
-The application will be live at:
-- **Frontend Portal:** `http://localhost:3000`
-- **Backend API Server:** `http://localhost:5001`
-- **Interactive Swagger Docs:** `http://localhost:5001/api-docs`
-- **API Health Check:** `http://localhost:5001/api/health`
+This command starts both services:
 
-*(Alternatively, you can run them in separate terminals)*:
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:5001>
+- Swagger API documentation: <http://localhost:5001/api-docs>
+- Health check: <http://localhost:5001/api/health>
+
+Keep this terminal open while using the application. Press `Ctrl+C` to stop both
+development servers.
+
+### Alternative method: start services separately
+
+Use two terminals when you want to see each service's logs independently.
+
+**Terminal 1 — backend:**
+
 ```bash
-# Terminal 1: Backend
-cd backend && node src/server.js
+cd /path/to/bookleaf
+npm run dev:backend
+```
 
-# Terminal 2: Frontend
+**Terminal 2 — frontend:**
+
+```bash
+cd /path/to/bookleaf
+npm run dev:frontend
+```
+
+The equivalent commands from inside each package are:
+
+```bash
+cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
----
+### Start the production-style frontend
 
-## 🤖 AI Integration & Production Considerations
+Build the Next.js application first, then serve the build:
 
-### 1. Model Choice: Gemini 2.5 Flash
-- **Justification:** Fast inference latency (~500ms), exceptional adherence to structured JSON schemas, and highly economical token pricing, making it ideal for high-volume support triage.
+```bash
+cd frontend
+npm run build
+npm run start
+```
 
-### 2. Prompt Engineering & Knowledge Base Grounding
-Prompts are grounded with the official BookLeaf policies:
-- 80/20 royalty split, net profit formula, 45-day quarterly payout cycle, ₹1,000 threshold.
-- In-house Delhi printing, 5–7 day turnaround, free reprints for verified defects.
-- Unique ISBN imprint rules, 48-hour escalation timeline for ISBN errors.
-- 24–48 hour stock sync for Amazon/Flipkart availability issues.
-- Empathetic tone acknowledging frustration before offering transparent solutions.
+The backend still needs to be running separately with `npm run dev:backend` or
+`npm start` from `backend/`.
 
-### 3. Graceful Degradation & Error Handling (Crucial)
-If the Gemini API key is missing, unauthorized, rate-limited, or network fails:
-- **Zero Downtime:** Ticket creation and admin drafting **never crash**.
-- The system automatically activates a knowledge-grounded semantic fallback classifier that evaluates the query and generates accurate, policy-aligned BookLeaf draft responses.
+## Database and seed data
 
-### 4. Cost Awareness & Token Optimization
-- Rather than resending the entire knowledge base on every query, the context retriever selectively injects only relevant policy sections based on query keywords (e.g. royalty keywords only retrieve royalty policies).
-- Compact JSON schemas minimize output token consumption.
+SQLite is stored in `database/bookleaf.db`. When the backend starts, it creates the
+schema if necessary and seeds the authors, books, and administrator accounts. The
+seed operation is safe to run again for restoring the baseline accounts and catalog:
 
----
+```bash
+npm run seed
+```
 
-## 🔑 Test Credentials (1-Click Switcher Available in UI)
+The seed operation does not create sample tickets, messages, or internal notes.
+Tickets are created when an author submits a query through the application.
 
-You can switch between any account with **1 click** using the account dropdown in the top navbar, or log in manually with the credentials below:
+To inspect the database using the project helper:
 
-### Operations Admin Accounts
-| Name | Role | Email | Password |
-| :--- | :--- | :--- | :--- |
-| **Ankit Verma** | Operations Lead | `admin@bookleafpub.in` | `admin123` |
-| **Pooja Iyer** | Author Relations | `support@bookleafpub.in` | `admin123` |
+```bash
+npm run db
+```
 
-### Sample Authors (From Assessment Dataset)
-| Author ID | Name | City | Email | Password |
-| :--- | :--- | :--- | :--- | :--- |
-| `AUTH001` | Priya Sharma | Mumbai | `priya.sharma@gmail.com` | `Priya Sharma` |
-| `AUTH002` | Rohit Kapoor | Delhi | `rohit.kapoor@gmail.com` | `Rohit Kapoor` |
-| `AUTH003` | Ananya Reddy | Hyderabad | `ananya.reddy@gmail.com` | `Ananya Reddy` |
-| `AUTH004` | Vikram Joshi | Pune | `vikram.joshi@gmail.com` | `Vikram Joshi` |
-| `AUTH005` | Meera Nair | Kochi | `meera.nair@gmail.com` | `Meera Nair` |
-| `AUTH006` | Arjun Malhotra | Chandigarh | `arjun.malhotra@gmail.com` | `Arjun Malhotra` |
-| `AUTH007` | Sneha Kulkarni | Bangalore | `sneha.kulkarni@gmail.com` | `Sneha Kulkarni` |
-| `AUTH008` | Farhan Sheikh | Lucknow | `farhan.sheikh@gmail.com` | `Farhan Sheikh` |
-| `AUTH009` | Kavita Deshmukh | Nagpur | `kavita.deshmukh@gmail.com` | `Kavita Deshmukh` |
-| `AUTH010` | Diya Chatterjee | Kolkata | `diya.chatterjee@gmail.com` | `Diya Chatterjee` |
+The application also exposes a database reset action in the operations interface.
+Resetting removes tickets, messages, and notes, then restores the baseline catalog.
+Use it only when you want to clear demonstration data.
 
----
+## How to demonstrate the application
 
-## 📡 REST API Reference
+### Author workflow
 
-Interactive Swagger documentation is available at `http://localhost:5001/api-docs`.
+1. Start the backend and frontend with `npm run dev`.
+2. Open <http://localhost:3000>.
+3. Leave the portal set to **Author**, or select **Author Portal** in the navbar.
+4. Choose an author from the account selector, or enter an email from the credentials
+   table below.
+5. Enter the author's name as the password.
+6. Open **My Books & Royalties** to review the catalog, production progress, and
+   royalty edge cases.
+7. Open **Submit Support Query**.
+8. Select a book, enter a subject and detailed description, and optionally attach a
+   JPG, PNG, or PDF file.
+9. Submit the query. The backend stores the ticket and generates its category,
+   priority, explanation, recommended action, and reply draft.
+10. Open **My Tickets** to see the new ticket and its live conversation.
 
-| Method | Endpoint | Description | Role Required |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | Email/password login, returns JWT | Public |
-| `POST` | `/api/auth/author/login` | Dedicated author login (`<name>@gmail.com` / Author Name) | Public |
-| `POST` | `/api/auth/admin/login` | Operations admin login (`admin` / `admin`) | Public |
-| `GET` | `/api/auth/test-accounts` | Returns all 10 authors and 2 admins | Public |
-| `GET` | `/api/auth/me` | Current authenticated session | Authenticated |
-| `GET` | `/api/books/my-books` | Author books with royalty metrics | Author / Admin |
-| `GET` | `/api/books/:id` | Single book details | Author / Admin |
-| `POST` | `/api/tickets` | Submit query with optional file attachment (triggers AI triage) | Author |
-| `GET` | `/api/tickets/:id/attachment` | View or download file attached by author | Author / Admin |
-| `GET` | `/api/tickets/my-tickets` | Author submitted tickets | Author |
-| `GET` | `/api/tickets/:id` | Ticket detail with message thread | Author / Admin |
-| `POST` | `/api/tickets/:id/messages` | Reply in thread (emits live SSE) | Author / Admin |
-| `PATCH` | `/api/tickets/:id/status` | Update ticket status | Author / Admin |
-| `GET` | `/api/admin/tickets` | Ticket queue with multi-filters | Admin |
-| `PATCH` | `/api/admin/tickets/:id/classification` | Override AI category & priority | Admin |
-| `POST` | `/api/admin/tickets/:id/regenerate-draft` | Re-run AI response generation | Admin |
-| `POST` | `/api/admin/tickets/:id/assign` | Assign ticket to team member | Admin |
-| `POST` | `/api/admin/tickets/:id/internal-notes`| Add private note (hidden from author) | Admin |
-| `GET` | `/api/admin/analytics` | High-level operations queue metrics | Admin |
-| `GET` | `/api/realtime/stream` | Server-Sent Events (SSE) live stream | Authenticated |
-| `POST` | `/api/database/reset` | Resets DB to initial sample dataset | Admin / Public |
+### Operations workflow
+
+1. Select **Admin Portal** in the navbar.
+2. Sign in with an administrator account.
+3. Review the ticket queue and use the filters or search box.
+4. Open a ticket to inspect the AI analysis and draft response.
+5. Edit or regenerate the draft when necessary.
+6. Override classification, assign the ticket, add an internal note, or send a
+   response.
+7. Keep the author portal open in another browser tab to observe SSE updates without
+   manually refreshing.
+
+## Test credentials
+
+The database seeder creates these administrator accounts:
+
+| Name | Email | Password |
+| --- | --- | --- |
+| Ankit Verma (Operations Lead) | `admin@bookleafpub.in` | `admin123` |
+| Pooja Iyer (Author Relations) | `support@bookleafpub.in` | `admin123` |
+
+The ten author accounts come from `database/bookleaf_sample_data.json`. For every
+author, the password is the author's full name, for example
+`Priya Sharma`. The application also provides an account selector and a public
+test-account endpoint, so it is not necessary to memorise every account:
+
+```text
+GET http://localhost:5001/api/auth/test-accounts
+```
+
+Example author account:
+
+| Author ID | Name | Email | Password |
+| --- | --- | --- | --- |
+| `AUTH001` | Priya Sharma | `priya.sharma@gmail.com` | `Priya Sharma` |
+
+Other accepted demonstration passwords include `author123` for authors and
+`admin` for administrators. Use the named passwords above for the clearest
+assignment demonstration.
+
+## API reference
+
+Interactive documentation is available at <http://localhost:5001/api-docs>.
+The OpenAPI JSON document is available at
+<http://localhost:5001/api/openapi.json>.
+
+| Method | Endpoint | Purpose | Access |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | Unified login | Public |
+| `POST` | `/api/auth/author/login` | Author login | Public |
+| `POST` | `/api/auth/admin/login` | Administrator login | Public |
+| `GET` | `/api/auth/test-accounts` | List seeded demonstration accounts | Public |
+| `GET` | `/api/auth/me` | Read the current authenticated user | Authenticated |
+| `GET` | `/api/books/my-books` | Read an author's books and royalties | Author/admin |
+| `POST` | `/api/tickets` | Create a support ticket | Author |
+| `GET` | `/api/tickets/my-tickets` | Read an author's tickets | Author |
+| `GET` | `/api/tickets/:id` | Read a ticket and messages | Author/admin |
+| `POST` | `/api/tickets/:id/messages` | Send a ticket reply | Author/admin |
+| `PATCH` | `/api/tickets/:id/status` | Update ticket status | Author/admin |
+| `GET` | `/api/tickets/:id/attachment` | View or download an attachment | Author/admin |
+| `GET` | `/api/admin/tickets` | Read and filter the operations queue | Admin |
+| `PATCH` | `/api/admin/tickets/:id/classification` | Override category or priority | Admin |
+| `POST` | `/api/admin/tickets/:id/regenerate-draft` | Generate a new reply draft | Admin |
+| `POST` | `/api/admin/tickets/:id/assign` | Assign a ticket | Admin |
+| `POST` | `/api/admin/tickets/:id/internal-notes` | Add a private internal note | Admin |
+| `GET` | `/api/admin/analytics` | Read queue metrics | Admin |
+| `GET` | `/api/realtime/stream` | Open the SSE update stream | Authenticated |
+| `GET` | `/api/health` | Check API and AI availability | Public |
+
+## Environment and frontend API URL
+
+By default, the frontend sends API requests to
+`http://localhost:5001/api`. To run the backend on another host or port, create
+`frontend/.env.local` before starting Next.js:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+```
+
+`NEXT_PUBLIC_API_URL` must include the `/api` suffix. The real-time client derives
+the backend origin from the same value.
+
+## Useful npm commands
+
+Run these commands from the project root:
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start backend and frontend together |
+| `npm run dev:backend` | Start only the backend |
+| `npm run dev:frontend` | Start only the frontend |
+| `npm run seed` | Initialise schema and restore seeded users/books |
+| `npm run db` | Run the database inspection helper |
+| `npm run test:ai` | Run the AI test cases |
+
+Run these commands from `frontend/`:
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the Next.js development server |
+| `npm run build` | Create a production frontend build |
+| `npm run start` | Serve the production frontend build |
+
+## Troubleshooting
+
+### `node:sqlite` or `DatabaseSync` is unavailable
+
+Confirm that Node.js is version 24 or newer:
+
+```bash
+node --version
+```
+
+Install a current Node.js 24 release and run the installation steps again.
+
+### The frontend cannot connect to the API
+
+1. Confirm that the backend terminal is running.
+2. Open <http://localhost:5001/api/health> directly.
+3. Check that `NEXT_PUBLIC_API_URL` is either unset or exactly
+   `http://localhost:5001/api`.
+4. Restart the frontend after changing `.env.local`, because Next.js reads public
+   environment variables when it starts.
+
+### Gemini analysis is unavailable
+
+This is expected when `GEMINI_API_KEY` is not configured. The backend uses the
+local knowledge-grounded fallback for ticket classification and draft generation.
+For live Gemini analysis, set both `GEMINI_API_KEY` and `GEMINI_MODEL` in the root
+`.env` file and restart the backend.
+
+### Login fails or the database is in an unexpected state
+
+Run the seed command from the project root and restart the backend:
+
+```bash
+npm run seed
+```
+
+### Port 3000 or 5001 is already in use
+
+Stop the process using the port, or set `PORT` in the root `.env` for the backend.
+If the backend port changes, update `NEXT_PUBLIC_API_URL` in
+`frontend/.env.local` to match.
+
+## Project structure
+
+```text
+bookleaf/
+├── aiml/                         # AI test cases and knowledge base experiments
+├── backend/
+│   ├── src/
+│   │   ├── config/               # Environment and server configuration
+│   │   ├── database/             # SQLite connection, schema initialisation, seeder
+│   │   ├── middleware/           # JWT authentication and role checks
+│   │   ├── routes/               # Auth, books, tickets, and admin API routes
+│   │   ├── services/             # AI, knowledge-base, and SSE services
+│   │   └── server.js             # Express application entry point
+│   └── package.json
+├── database/
+│   ├── bookleaf.db               # Local SQLite database
+│   ├── bookleaf_sample_data.json # Seed authors and books
+│   └── schema.sql                # Relational schema
+├── frontend/
+│   ├── src/app/                  # Next.js app entry point and global styles
+│   ├── src/components/           # Author and admin portal components
+│   ├── src/context/              # Authentication, theme, and SSE state
+│   ├── src/services/             # Frontend API client
+│   └── package.json
+├── scripts/dev.js                # Starts both development services
+├── package.json                  # Root scripts and dependencies
+└── WRITEUP.md                    # Engineering approach and production roadmap
+```
+
+## Submission notes
+
+- Start with `npm run dev` and verify both `http://localhost:3000` and
+  `http://localhost:5001/api/health` before demonstrating the project.
+- Use an author account to create a ticket, then use an administrator account to
+  process it. This demonstrates the complete end-to-end workflow.
+- Do not commit `.env`, API keys, or other secrets.
+- `WRITEUP.md` contains the design decisions, trade-offs, and production roadmap
+  that complement this README.
