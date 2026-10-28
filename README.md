@@ -266,19 +266,26 @@ The database seeder creates these administrator accounts:
 | Pooja Iyer (Author Relations) | `support@bookleafpub.in` | `admin123` |
 
 The ten author accounts come from `database/bookleaf_sample_data.json`. For every
-author, the password is the author's full name, for example
-`Priya Sharma`. The application also provides an account selector and a public
-test-account endpoint, so it is not necessary to memorise every account:
+author, the password is the author's full name. Full author email/password list:
+
+| Email | Password (author name) |
+| --- | --- |
+| `priya.sharma@gmail.com` | `Priya Sharma` |
+| `rohit.kapoor@gmail.com` | `Rohit Kapoor` |
+| `ananya.reddy@gmail.com` | `Ananya Reddy` |
+| `vikram.joshi@gmail.com` | `Vikram Joshi` |
+| `meera.nair@gmail.com` | `Meera Nair` |
+| `arjun.malhotra@gmail.com` | `Arjun Malhotra` |
+| `sneha.kulkarni@gmail.com` | `Sneha Kulkarni` |
+| `farhan.sheikh@gmail.com` | `Farhan Sheikh` |
+| `kavita.deshmukh@gmail.com` | `Kavita Deshmukh` |
+| `diya.chatterjee@gmail.com` | `Diya Chatterjee` |
+
+The application also provides an account selector and a public test-account endpoint:
 
 ```text
 GET http://localhost:5001/api/auth/test-accounts
 ```
-
-Example author account:
-
-| Author ID | Name | Email | Password |
-| --- | --- | --- | --- |
-| `AUTH001` | Priya Sharma | `priya.sharma@gmail.com` | `Priya Sharma` |
 
 Other accepted demonstration passwords include `author123` for authors and
 `admin` for administrators. Use the named passwords above for the clearest
