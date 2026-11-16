@@ -6,32 +6,47 @@
 
 ---
 
-## Executive Summary & Quick Start
+## ⚡ Quick Start for Reviewers
 
-This project implements an end-to-end **Author Royalty Dashboard & Automated Notification System** for BookLeaf Publishing. It empowers authors to monitor their sales, earnings, and payout statuses with visual clarity (Green, Yellow, Red overdue badges), while equipping the operations team with admin oversight, filtering, and 1-click AI-powered royalty summary distribution via an automated n8n workflow.
+### 1. Setup All Workspace Dependencies (1 Command):
+```bash
+npm run setup
+```
 
-### Deliverables Included in this Folder (`assignment_2/`):
-1. **System Explainer & Plain-English Walkthrough:** [`SYSTEM_EXPLAINER.md`](file:///home/rakshit/bookleaf/assignment_2/SYSTEM_EXPLAINER.md) — Complete breakdown of business purpose, architecture flow, edge cases, and 1-to-1 PDF requirements audit.
-2. **Ready-to-Import n8n Workflow JSON:** [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json) — Standards-compliant n8n export featuring webhook security, idempotency de-duplication, financial aggregation, AI prompt grounding, error recovery, Bubble Data API callback, and bonus SMTP email delivery.
+### 2. Start n8n & Import Workflow (**Compulsory Step**):
+```bash
+npx n8n
+```
+1. Open **`http://localhost:5678`** in your browser.
+2. Click **`...` (top-right menu)** ➔ **Import from File**.
+3. Select: [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json).
+4. Click **Save**, then flip the switch in the top-right to **"Active" / "Publish"** (or click **"Test workflow"** at the bottom to watch nodes execute visually).
+
+### 3. Launch the Companion Application:
+```bash
+npm run dev:assignment_2
+```
+Open **`http://localhost:5002`** in your browser.
+
+### 4. Run Automated Integration Tests:
+```bash
+npm run test:assignment_2
+```
+
+---
+
+## 📁 Deliverables Included in this Folder (`assignment_2/`)
+
+1. **System Explainer & Plain-English Walkthrough:** [`SYSTEM_EXPLAINER.md`](file:///home/rakshit/bookleaf/assignment_2/SYSTEM_EXPLAINER.md) — Comprehensive breakdown of business context, execution lifecycle, edge cases, and 1-to-1 PDF requirements audit.
+2. **Ready-to-Import n8n Workflow JSON:** [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json) — Production-grade n8n workflow with webhook security header check, 3-minute idempotency de-duplication, knowledge-grounded math engine, AI prompt generation, resilient fallback, Bubble callback, and bonus SMTP email delivery.
 3. **Ready-to-Upload Bubble CSV Datasets:** 
    - [`data/Bubble_Authors.csv`](file:///home/rakshit/bookleaf/assignment_2/data/Bubble_Authors.csv) (10 Authors)
    - [`data/Bubble_Books.csv`](file:///home/rakshit/bookleaf/assignment_2/data/Bubble_Books.csv) (18 Books)
    - [`data/Bubble_Notification_Logs.csv`](file:///home/rakshit/bookleaf/assignment_2/data/Bubble_Notification_Logs.csv)
 4. **Step-by-Step Bubble Setup Manual:** [`BUBBLE_IMPLEMENTATION_GUIDE.md`](file:///home/rakshit/bookleaf/assignment_2/BUBBLE_IMPLEMENTATION_GUIDE.md) — Field-by-field database types, privacy rules, repeating groups, and API Connector setup.
-5. **n8n Workflow Execution Guide:** [`N8N_WORKFLOW_GUIDE.md`](file:///home/rakshit/bookleaf/assignment_2/N8N_WORKFLOW_GUIDE.md) — Node-by-node architecture, environment configuration, and curl test scripts.
-6. **Loom Video Presentation Script:** [`LOOM_WALKTHROUGH_SCRIPT.md`](file:///home/rakshit/bookleaf/assignment_2/LOOM_WALKTHROUGH_SCRIPT.md) — 3–5 minute timed walkthrough script covering author portal, admin portal, n8n trigger, and edge case demonstration.
-7. **Interactive Full-Stack Companion App:** Located in [`app/`](file:///home/rakshit/bookleaf/assignment_2/app/) — An interactive local implementation simulating the Bubble UI, privacy rules, live n8n webhook, and AI generation.
-
-### Running the Companion Prototype Locally:
-```bash
-# From workspace root:
-npm run dev:assignment2
-
-# Or directly from assignment_2/app:
-cd assignment_2/app
-node server.js
-```
-Open **`http://localhost:5002`** in your browser.
+5. **n8n Workflow Execution Guide:** [`N8N_WORKFLOW_GUIDE.md`](file:///home/rakshit/bookleaf/assignment_2/N8N_WORKFLOW_GUIDE.md) — Execution modes (Active vs. Test Mode), node topology, and curl commands.
+6. **Interactive Full-Stack Companion App:** Located in [`app/`](file:///home/rakshit/bookleaf/assignment_2/app/) — An interactive local implementation simulating the Bubble UI, privacy rules, live n8n webhook, and AI generation.
+7. *(Note: The Loom Video Script is kept outside this folder at `LOOM_WALKTHROUGH_SCRIPT.md` as a local recording aid).*
 
 ---
 
@@ -74,7 +89,7 @@ flowchart TD
 ## 2. Bubble.io Application Architecture (25% Weight)
 
 ### 2.1 Relational Database Design
-In Bubble, rather than nesting un-queryable JSON objects, we established a clean relational database architecture matching SQL best practices:
+Rather than nesting un-queryable JSON objects, we established a clean relational database architecture matching SQL best practices:
 
 | Data Type | Field Name | Bubble Type | Description & Purpose |
 | :--- | :--- | :--- | :--- |
@@ -112,7 +127,6 @@ In Bubble, rather than nesting un-queryable JSON objects, we established a clean
 | | `idempotency_key` | text | De-duplication key. |
 
 ### 2.2 Bubble Privacy Rules (Security & Data Isolation)
-To guarantee strict tenant isolation as tested by reviewers:
 1. **Author Access Isolation:**
    - Rule: `Current User is Logged in AND Current User's user_type is "Author"`
    - Condition: `This Author's Email is Current User's Email`
@@ -126,77 +140,55 @@ To guarantee strict tenant isolation as tested by reviewers:
    - Access: Zero access to database records.
 
 ### 2.3 Status Badge Conditional Logic
-The visual badge formulas enforce BookLeaf's operational policies:
-- **Green Badge ("Fully Paid"):**
-  - Condition: `This Book's royalty_pending is 0`
-- **Yellow Badge ("Pending - In Cycle"):**
-  - Condition: `This Book's royalty_pending > 0 AND (Current Date - This Book's last_royalty_payout_date):days < 90`
-- **Red Badge ("Overdue Payout"):**
-  - Condition: `This Book's royalty_pending > 0 AND ((Current Date - This Book's last_royalty_payout_date):days >= 90 OR (This Book's last_royalty_payout_date is empty AND (Current Date - This Book's publication_date):days > 90))`
-- **Purple Badge ("In Production"):**
-  - Condition: `This Book's status contains "In Production"`
+- 🟢 **Green Badge ("Fully Paid"):** `This Book's royalty_pending is 0`
+- 🟡 **Yellow Badge ("Pending - In Cycle"):** `This Book's royalty_pending > 0 AND (Current Date - This Book's last_royalty_payout_date):days < 90`
+- 🔴 **Red Badge ("Overdue Payout"):** `This Book's royalty_pending > 0 AND ((Current Date - This Book's last_royalty_payout_date):days >= 90 OR (This Book's last_royalty_payout_date is empty AND (Current Date - This Book's publication_date):days > 90))`
+- 🟣 **Purple Badge ("In Production"):** `This Book's status contains "In Production"`
 
 ---
 
 ## 3. n8n Automation Workflow Design (25% Weight)
 
-The production workflow is saved at [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json).
-
 ### 3.1 Node Pipeline & Organization
 1. **Webhook Trigger Node (`POST /webhook/generate-royalty-summary`):**
-   - Configured with `responseMode: "responseNode"` to allow fine-grained asynchronous responses back to Bubble.
+   - Configured with `responseMode: "responseNode"` to return structured responses to Bubble.
 2. **Validate Auth Header (IF Node):**
-   - Inspects `x-bookleaf-api-key` or `Authorization: Bearer <token>`. Rejects unauthorized calls with HTTP 401.
+   - Inspects `$json.headers['x-bookleaf-api-key']`. Rejects unauthorized calls with HTTP 401.
 3. **Idempotency & Deduplication Check (Code Node):**
-   - Tracks incoming requests by `idempotency_key` or `author_id + date`.
-   - Prevents duplicate runs if an admin double-clicks "Generate & Send".
+   - Tracks incoming requests within a 3-minute sliding window to prevent duplicate runs if an admin double-clicks.
 4. **Aggregate Metrics & Knowledge Base Policy Engine (Code Node):**
-   - Calculates lifetime sales, earned, paid, and pending balances across all books.
-   - Computes upcoming quarterly disbursement deadline (Q1: May 15, Q2: Aug 15, Q3: Nov 15, Q4: Feb 15).
+   - Computes upcoming quarterly deadline (Q1: May 15, Q2: Aug 15, Q3: Nov 15, Q4: Feb 15).
    - Enforces the ₹1,000 threshold rule: if pending is below ₹1,000, marks as rollover.
-   - Flags overdue titles (>90 days without payout).
-   - Collects in-production stages (Cover Design, Typesetting).
+   - Flags overdue titles (>90 days without payout) and collects in-production stages.
 5. **AI Processing Node (OpenAI / Gemini / Anthropic HTTP Node):**
-   - Executes with `temperature: 0.3` to guarantee mathematical precision while producing warm, empathetic prose.
+   - Executes with `temperature: 0.3` to guarantee mathematical precision and empathetic tone.
 6. **Format Email & Fallback Handler (Code Node):**
-   - Extracts AI completion. If the AI API fails or times out, seamlessly activates the knowledge-grounded deterministic fallback template so the workflow never breaks silently.
+   - Extracts AI completion or seamlessly activates the knowledge-grounded fallback template if downstream AI times out.
 7. **Bubble Data API Callback Node (`POST /api/1.1/obj/notification_log`):**
-   - Synchronously updates Bubble's database with `status: "Success"`, timestamp, and the generated email text.
-8. **Send Email Node (Bonus SMTP Node):**
-   - Sends the royalty summary email to the author's inbox.
-9. **Return Success to Bubble UI (Respond to Webhook Node):**
+   - Updates Bubble's database with `status: "Success"`, timestamp, and generated email text.
+8. **Return Success to Bubble UI (Respond to Webhook Node):**
    - Returns clean JSON with `{ success: true, status: "Success", log_id: "..." }`.
 
 ---
 
 ## 4. AI Prompt Strategy & Output Quality (20% Weight)
 
-### 4.1 Knowledge Base Grounding & Edge Cases
 The AI prompt strictly adheres to BookLeaf's official policy:
 - **80/20 Net Profit Split:** Acknowledges the author's 80% share.
 - **Quarterly Cycle & 45-Day Window:** Accurately states the payout timeline.
-- **Minimum ₹1,000 Threshold:** 
-  - For Kavita Deshmukh (`AUTH009`, ₹850 pending): The AI explains that royalties under ₹1,000 roll over to the next quarter.
-- **Overdue Escalation:**
-  - For Ananya Reddy (`AUTH003`, ₹2,546 pending, published >90 days ago, never paid): The AI informs the author that accounts operations has flagged their file for prioritized settlement.
-- **In-Production Reassurance:**
-  - For Sneha Kulkarni (`AUTH007`): Includes an update that *Midnight in Mysore* is currently in Cover Design.
-- **Fully Paid Acknowledgement:**
-  - For Farhan Sheikh (`AUTH008`, pending ₹0): Delivers a warm congratulatory note thanking him for his publishing partnership.
+- **Minimum ₹1,000 Threshold:** For Kavita Deshmukh (`AUTH009`, ₹850 pending), the AI explains that royalties under ₹1,000 roll over to the next quarter.
+- **Overdue Escalation:** For Ananya Reddy (`AUTH003`, ₹2,546 pending, published >90 days ago, never paid), the AI informs the author that operations has prioritized her account for reconciliation.
+- **In-Production Reassurance:** For Sneha Kulkarni (`AUTH007`), includes an update that *Midnight in Mysore* is in Cover Design.
+- **Fully Paid Acknowledgement:** For Farhan Sheikh (`AUTH008`, pending ₹0), delivers a warm congratulatory note.
 
 ---
 
 ## 5. Integration Quality, Security & Error Handling (15% Weight)
 
-1. **Webhook Security:**
-   - Protected with an API key header (`x-bookleaf-api-key: bk_live_7f8a9e2d4c1b`).
-2. **Bubble UI Non-Blocking States:**
-   - Buttons enter a loading state and are disabled immediately upon click.
-   - A 10-second timeout ensures the UI never hangs indefinitely.
-3. **Idempotency:**
-   - Client-side button debouncing + n8n 3-minute sliding window cache ensures zero duplicate emails.
-4. **Graceful Error Recovery:**
-   - If downstream AI services fail, n8n logs the failure to Bubble with an explicit reason (`Failed`), enabling admins to retry without data corruption.
+1. **Webhook Security:** Protected with header auth (`x-bookleaf-api-key: bk_live_7f8a9e2d4c1b`).
+2. **Bubble UI Non-Blocking States:** Buttons enter a loading state and are disabled immediately upon click.
+3. **Idempotency:** Client-side debouncing + n8n 3-minute sliding window cache ensures zero duplicate emails.
+4. **Graceful Error Recovery:** Downstream failures log as `Failed` to the Notification Log with reasons attached.
 
 ---
 
@@ -207,7 +199,7 @@ The AI prompt strictly adheres to BookLeaf's official policy:
 | **Bubble App Live URL** | Provide deployed Bubble URL (or local companion URL `http://localhost:5002`) | Live interactive dashboard |
 | **Test Author Credentials** | `priya.sharma@gmail.com` / `BookLeaf2026!` | Author with 2 books, ₹3,570 pending |
 | **Test Admin Credentials** | `admin_ops@bookleaf.in` / `AdminSecret2026!` | Full operations access |
-| **n8n Workflow Export** | [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json) | Direct import into n8n Cloud / self-hosted |
-| **Documentation (README)**| [`assignment_2/README.md`](file:///home/rakshit/bookleaf/assignment_2/README.md) | This document |
-| **Screen Recording Script**| [`LOOM_WALKTHROUGH_SCRIPT.md`](file:///home/rakshit/bookleaf/assignment_2/LOOM_WALKTHROUGH_SCRIPT.md) | Word-for-word 3–5 min video guide |
-| **CSV Datasets** | [`data/Bubble_Authors.csv`](file:///home/rakshit/bookleaf/assignment_2/data/Bubble_Authors.csv) & [`data/Bubble_Books.csv`](file:///home/rakshit/bookleaf/assignment_2/data/Bubble_Books.csv) | 1-click Bubble database import |
+| **n8n Workflow Export** | [`n8n/bookleaf_royalty_notification_workflow.json`](n8n/bookleaf_royalty_notification_workflow.json) | Direct import into n8n Cloud / self-hosted |
+| **Documentation (README)**| [`assignment_2/README.md`](README.md) & [`SYSTEM_EXPLAINER.md`](SYSTEM_EXPLAINER.md) | Technical reports |
+| **Screen Recording Script**| `LOOM_WALKTHROUGH_SCRIPT.md` (at workspace root) | 3–5 min video guide |
+| **CSV Datasets** | [`data/Bubble_Authors.csv`](data/Bubble_Authors.csv) & [`data/Bubble_Books.csv`](data/Bubble_Books.csv) | 1-click Bubble database import |

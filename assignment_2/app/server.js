@@ -407,7 +407,8 @@ app.post('/webhook/generate-royalty-summary', async (req, res) => {
       author_email: authorEnriched.email,
       email_content: generatedEmail,
       sent_timestamp: logEntry.sent_timestamp,
-      log_id: logEntry.log_id
+      log_id: logEntry.log_id,
+      used_live_n8n: usedLiveN8n
     });
   } catch (err) {
     console.error('Workflow error:', err);

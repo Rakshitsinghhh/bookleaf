@@ -1,74 +1,131 @@
 # BookLeaf Publishing — n8n Automation Workflow Guide
 
-This guide explains the architecture, deployment, and testing of the **n8n Royalty Notification & AI Summary Pipeline**.
+This guide details how to install, import, and execute the **n8n Royalty Notification & AI Summary Pipeline**.
 
 ---
 
-## 1. Quick Import Instructions
+## ⚠️ Important: Is Importing the Workflow Compulsory?
 
-1. Open your **n8n** instance (n8n Cloud free trial or local `npx n8n`).
-2. Go to **Workflows > Import from File**.
-3. Select [`n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json).
-4. Click **Save** and toggle the workflow to **Active**.
+**YES, IT IS COMPULSORY.**  
+n8n is an orchestration engine that starts with an empty canvas. It has no built-in knowledge of BookLeaf's data model, webhook security header, 90-day overdue logic, quarterly calculation cycles, or AI prompt structure.
 
----
-
-## 2. Environment Variables & Credentials
-
-Set the following variables in n8n (`Settings > Variables` or `.env`):
-
-| Variable Name | Example Value | Description |
-| :--- | :--- | :--- |
-| `N8N_WEBHOOK_SECRET` | `bk_live_7f8a9e2d4c1b` | Secret token expected in `x-bookleaf-api-key` header. |
-| `OPENAI_API_KEY` | `sk-...` | API key for OpenAI LLM (`gpt-4o-mini`). |
-| `GEMINI_API_KEY` | `AIza...` | Optional Gemini API key if using Gemini node. |
-| `BUBBLE_APP_URL` | `https://your-bubble-app.bubbleapps.io` | Base URL of your Bubble application. |
-| `BUBBLE_API_TOKEN` | `bubble_sec_token_...` | API Token generated in Bubble Settings > API. |
+You **must** import the prepared workflow file:  
+📁 [`assignment_2/n8n/bookleaf_royalty_notification_workflow.json`](file:///home/rakshit/bookleaf/assignment_2/n8n/bookleaf_royalty_notification_workflow.json)
 
 ---
 
-## 3. Webhook Architecture Decision: Payload vs. Data API Query
+## 1. Quick Installation & Launch
 
-The assignment prompt asks:
-> *"n8n pulls the author’s complete data — either by querying the Bubble Data API or by receiving the full payload in the webhook. Either approach is acceptable; justify your choice."*
+You can run n8n in either of two ways:
 
-### Architectural Justification:
-We designed a **Hybrid Resilient Pattern**:
-1. **Primary Pattern (Full Webhook Payload):**
-   - **Rationale:** Minimizes latency and eliminates unnecessary HTTP round-trips against Bubble's Data API rate limits. Bubble already holds the author's books and sales in memory when the admin clicks "Generate & Send", making payload passing near-instant (~50ms execution vs ~450ms multi-query latency).
-2. **Fallback Pattern (Bubble Data API Query):**
-   - **Rationale:** If only `{ "author_id": "AUTH001" }` is transmitted (e.g. from a bulk scheduled cron or external trigger), the workflow dynamically fetches the author and books via `GET /api/1.1/obj/book?constraints=[{"key":"author","constraint_type":"equals","value":"AUTH001"}]`.
-   - **Trade-off Evaluation:** This hybrid pattern provides the speed of direct payload passing with the decoupling flexibility of an API query.
-
----
-
-## 4. Testing the Workflow via cURL
-
-### 4.1 Valid Authorized Single Trigger (Priya Sharma)
+### Option A: Local n8n (Easiest for Evaluation)
+Run directly in your terminal (no installation required via npx):
 ```bash
-curl -X POST http://localhost:5002/webhook/generate-royalty-summary \
+npx n8n
+```
+Open **`http://localhost:5678`** in your browser.
+
+### Option B: n8n Cloud
+1. Go to [https://n8n.io](https://n8n.io) and start a free trial.
+2. Open your cloud workspace.
+
+---
+
+## 2. Importing the Workflow (Compulsory Step)
+
+1. In the n8n canvas, click the **`...` (Options / Menu)** button in the top-right corner.
+2. Click **"Import from File"**.
+3. Select:  
+   `assignment_2/n8n/bookleaf_royalty_notification_workflow.json`
+4. Click **Save** (or press `Ctrl + S`).
+5. *All 12 nodes, branches, and connections will instantly appear on your screen.*
+
+---
+
+## 3. How to Run & Execute in n8n (Two Execution Modes)
+
+Reviewers can execute the workflow in either of two modes depending on how they prefer to evaluate:
+
+### Mode 1: Active / Published Mode (Recommended for Continuous Portal Use)
+- Look in the top-right corner next to the **Save** button.
+- Click the toggle switch to **"Active" / "Publish"**:
+  ```
+  [ Inactive ◯────── ]  ➔  [ Active ──────◯ ]
+  ```
+- **How it works:** n8n listens 24/7 on the production webhook URL (`http://localhost:5678/webhook/generate-royalty-summary`).
+- Any button click from the portal on `http://localhost:5002` or CLI command will automatically trigger n8n in the background.
+- Reviewers can view all past executions and outputs by clicking **"Executions"** in the left sidebar.
+
+### Mode 2: Canvas Test Mode (To Watch Nodes Light Up Green Visually)
+- Leave the toggle on **Inactive**.
+- At the bottom of the canvas, click the big button: **"Test workflow"** (or **"Execute workflow"**).
+- n8n will show a pulsing indicator: *"Waiting for webhook call..."*.
+- Now trigger a summary from the portal (`http://localhost:5002`) or via curl:
+  ```bash
+  node assignment_2/test-live-tunnel.js
+  ```
+- **How it works:** In Test Mode, n8n captures the single incoming call, visually animates the data flowing through each node, and turns every executed node green with a checkmark!
+
+---
+
+## 4. Pipeline Topology & Node-by-Node Architecture
+
+```
+[Bubble / Portal Trigger] 
+          │ (POST /webhook/generate-royalty-summary)
+          ▼
+1. Webhook Trigger Node
+          │
+          ▼
+2. Validate Auth Header (checks x-bookleaf-api-key: bk_live_7f8a9e2d4c1b)
+          ├── [Invalid] ➔ 3. Reject 401 Unauthorized
+          └── [Valid]   ➔ 4. Idempotency & Deduplication Check (3-min cache)
+                               ├── [Duplicate] ➔ 6. Return Duplicate Notice
+                               └── [New]       ➔ 7. Knowledge Base Math & Policy Engine
+                                                         │
+                                                         ▼
+                                                 8. AI LLM Generation Node (OpenAI / Gemini)
+                                                         │
+                                                         ▼
+                                                 9. Email Formatter & Fallback Handler
+                                                         │
+                                                         ├── 10. Bubble Data API Callback (Audit Log)
+                                                         ├── 11. Send Email Node (Bonus SMTP)
+                                                         └── 12. Return Success to Bubble UI
+```
+
+---
+
+## 5. Architectural Decision: Webhook Payload vs. Data API Query
+
+The assignment asks candidates to justify:
+> *"either by querying the Bubble Data API or by receiving the full payload in the webhook. Either approach is acceptable; justify your choice."*
+
+**Our Choice: Hybrid Resilient Architecture**
+1. **Primary Webhook Payload:** When the admin clicks "Generate & Send" in the portal, the application already holds the author's books in state. Passing the data directly in the webhook payload reduces latency from ~450ms down to ~50ms, eliminating redundant round-trip API queries against Bubble's database rate limits.
+2. **Fallback API Query:** If an external scheduler triggers the webhook with only `{ "author_id": "AUTH001" }`, the workflow dynamically fetches the author's catalog from the Bubble Data API.
+
+---
+
+## 6. CLI Testing Commands
+
+### Test 1: Authorized Trigger
+```bash
+curl -X POST http://localhost:5678/webhook/generate-royalty-summary \
   -H "Content-Type: application/json" \
   -H "x-bookleaf-api-key: bk_live_7f8a9e2d4c1b" \
   -d '{
     "author_id": "AUTH001",
+    "name": "Priya Sharma",
+    "email": "priya.sharma@gmail.com",
+    "city": "Mumbai",
     "trigger_type": "Manual Single",
-    "idempotency_key": "AUTH001-TEST-01"
+    "idempotency_key": "TEST-MANUAL-001"
   }'
 ```
-**Expected Response:** HTTP 200 with `{ "status": "Success", "author_id": "AUTH001", "email_content": "..." }`.
 
-### 4.2 Security Test: Missing or Invalid API Key
-```bash
-curl -X POST http://localhost:5002/webhook/generate-royalty-summary \
-  -H "Content-Type: application/json" \
-  -H "x-bookleaf-api-key: wrong_token" \
-  -d '{ "author_id": "AUTH001" }'
-```
-**Expected Response:** HTTP 401 Unauthorized.
-
-### 4.3 Idempotency Test: Duplicate Trigger
-Run the command from 4.1 twice within 3 minutes with the same `idempotency_key`.  
-**Expected Response on 2nd Run:**
+### Test 2: Idempotency (Duplicate Suppression)
+Run the exact command above a second time immediately. n8n will return:
 ```json
 {
   "success": true,
@@ -77,14 +134,11 @@ Run the command from 4.1 twice within 3 minutes with the same `idempotency_key`.
 }
 ```
 
-### 4.4 Error Handling & Fallback Test
+### Test 3: Unauthorized Call
 ```bash
-curl -X POST http://localhost:5002/webhook/generate-royalty-summary \
+curl -X POST http://localhost:5678/webhook/generate-royalty-summary \
   -H "Content-Type: application/json" \
-  -H "x-bookleaf-api-key: bk_live_7f8a9e2d4c1b" \
-  -d '{
-    "author_id": "AUTH001",
-    "simulate_error": true
-  }'
+  -H "x-bookleaf-api-key: wrong_key" \
+  -d '{"author_id":"AUTH001"}'
 ```
-**Expected Behavior:** Returns HTTP 500 with failure reason and writes a `Failed` entry into the Bubble Notification Log without crashing.
+Returns: `HTTP 401 Unauthorized`.

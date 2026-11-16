@@ -1,6 +1,6 @@
 # BookLeaf Publishing — Full-Stack Technical Assessments
 
-Welcome to the technical assessment submission for BookLeaf Publishing. This workspace is organized into two distinct directories to allow reviewers to independently evaluate, run, and test **Assignment 1** and **Assignment 2**.
+Welcome to the technical assessment submission for BookLeaf Publishing. This workspace is cleanly organized into two distinct directories to allow reviewers to independently evaluate, run, and test **Assignment 1** and **Assignment 2**.
 
 ---
 
@@ -9,7 +9,6 @@ Welcome to the technical assessment submission for BookLeaf Publishing. This wor
 To automatically install all dependencies across the root, Assignment 1 (backend & Next.js frontend), and Assignment 2 (companion app), seed databases, and generate fresh Bubble CSV files:
 
 ```bash
-# Run one command:
 npm run setup
 ```
 *(Or use `./setup.sh` on Linux/macOS)*
@@ -28,6 +27,26 @@ npm run setup
 
 ---
 
+## ⚠️ Important Note for Reviewing Assignment 2 (n8n Workflow)
+
+### Is Importing the n8n Workflow Compulsory?
+**YES, IT IS COMPULSORY.**  
+n8n is an orchestration engine that starts with an empty canvas. It has no pre-existing knowledge of BookLeaf's webhook security key, 90-day overdue calculations, or AI prompt templates.
+
+You **must** import the workflow file:  
+📁 [`assignment_2/n8n/bookleaf_royalty_notification_workflow.json`](assignment_2/n8n/bookleaf_royalty_notification_workflow.json)
+
+### How to Run & Execute in n8n (Two Simple Ways):
+1. **Launch n8n:**  
+   Run `npx n8n` in a terminal and open **`http://localhost:5678`** (or use n8n Cloud).
+2. **Import Workflow:**  
+   Click **`...` (top-right menu)** ➔ **Import from File** ➔ select `assignment_2/n8n/bookleaf_royalty_notification_workflow.json` ➔ click **Save**.
+3. **Execute Mode:**
+   - **Mode A (Active 24/7):** Flip the toggle in the top-right corner to **"Active" / "Publish"**. n8n will listen 24/7 and automatically process every portal button click in the background.
+   - **Mode B (Visual Test on Canvas):** Leave it inactive and click the big **"Test workflow" / "Execute workflow"** button at the bottom of the canvas. When a trigger arrives, you will watch each node light up green with checkmarks!
+
+---
+
 ## 📁 Repository Directory Structure
 
 ```
@@ -35,6 +54,7 @@ bookleaf/
 ├── setup.sh                                    # 1-click Linux/macOS setup launcher
 ├── scripts/
 │   └── setup.js                                # Cross-platform automated workspace installer
+├── LOOM_WALKTHROUGH_SCRIPT.md                  # Local 3–5 min video presentation script (kept local)
 │
 ├── assignment_1/                               # Technical Assignment 1: Support & Ticketing Portal
 │   ├── BookLeaf_Technical_Assignment_1.pdf     # Original assignment specification
@@ -50,8 +70,7 @@ bookleaf/
 │   ├── README.md                               # Master technical documentation & evaluation rubric guide
 │   ├── SYSTEM_EXPLAINER.md                     # Plain-English system breakdown & requirements audit
 │   ├── BUBBLE_IMPLEMENTATION_GUIDE.md          # Field-by-field Bubble.io schema & privacy rules manual
-│   ├── N8N_WORKFLOW_GUIDE.md                   # n8n node architecture, security & testing guide
-│   ├── LOOM_WALKTHROUGH_SCRIPT.md              # 3–5 minute timed presentation script for Loom video
+│   ├── N8N_WORKFLOW_GUIDE.md                   # n8n node architecture, security & execution guide
 │   ├── test-live-tunnel.js                     # Script to test live n8n tunnel webhook
 │   ├── data/
 │   │   ├── bookleaf_sample_data.json           # Original dataset (10 authors, 18 books)
@@ -88,7 +107,7 @@ bookleaf/
 
 ## 🔍 How to Review & Evaluate Assignment 1
 
-1. Start the Assignment 1 development stack:
+1. Start the development stack:
    ```bash
    npm run dev:assignment_1
    ```
@@ -136,4 +155,4 @@ bookleaf/
    - System Breakdown: [`assignment_2/SYSTEM_EXPLAINER.md`](assignment_2/SYSTEM_EXPLAINER.md)
    - Bubble Setup Manual: [`assignment_2/BUBBLE_IMPLEMENTATION_GUIDE.md`](assignment_2/BUBBLE_IMPLEMENTATION_GUIDE.md)
    - n8n Guide: [`assignment_2/N8N_WORKFLOW_GUIDE.md`](assignment_2/N8N_WORKFLOW_GUIDE.md)
-   - Loom Video Script: [`assignment_2/LOOM_WALKTHROUGH_SCRIPT.md`](assignment_2/LOOM_WALKTHROUGH_SCRIPT.md)
+   - Loom Video Script: `LOOM_WALKTHROUGH_SCRIPT.md` (at workspace root for local recording)

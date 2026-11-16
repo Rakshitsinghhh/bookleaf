@@ -297,7 +297,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (resData.status === 'Duplicate Skipped') {
         showToast(`⚠️ Idempotency Notice: ${resData.message}`, 'error');
       } else if (resData.status === 'Success') {
-        showToast(`✅ Royalty Summary Generated & Sent to ${author.email}!`, 'success');
+        const msg = resData.used_live_n8n 
+          ? `⚡ Success: Executed via LIVE n8n Pipeline & Dispatched to ${author.email}!` 
+          : `✅ Royalty Summary Generated & Dispatched to ${author.email}!`;
+        showToast(msg, 'success');
         document.getElementById('author-detail-modal').classList.remove('open');
         loadNotificationLogs();
         // Open preview
