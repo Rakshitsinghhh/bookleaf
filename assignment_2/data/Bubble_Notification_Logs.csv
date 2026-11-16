@@ -1,0 +1,2 @@
+Log_ID,Author_ID,Author_Name,Author_Email,Trigger_Type,Status,Generated_Email_Content,Sent_Timestamp,Error_Message,Idempotency_Key
+"LOG-INIT-001","AUTH001","Priya Sharma","priya.sharma@gmail.com","Manual Single","Success","Initial quarterly statement archived.","2025-10-15T10:00:00Z","","AUTH001-20251015"

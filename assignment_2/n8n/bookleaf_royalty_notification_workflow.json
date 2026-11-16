@@ -1,0 +1,371 @@
+{
+  "name": "BookLeaf - Author Royalty Notification & AI Summary Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-royalty-summary",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1e780721-a53d-4c31-893c-cf8c6a282461",
+      "name": "Bubble Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "bookleaf-royalty-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $headers['x-bookleaf-api-key'] || $headers['authorization'] }}",
+              "rightValue": "bk_live_7f8a9e2d4c1b",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2b890832-b64e-4d42-9a4d-df9d7b393572",
+      "name": "Validate Auth Header",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Unauthorized: Missing or invalid x-bookleaf-api-key header.\",\n  \"status\": 401\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "3c901943-c75f-4e53-ab5e-ea0e8c404683",
+      "name": "Reject 401 Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Idempotency & De-duplication Cache Check\n// In production, backed by Redis or Bubble Notification Log query\nconst authorId = $json.body?.author_id || $json.author_id;\nconst idempotencyKey = $json.body?.idempotency_key || $json.idempotency_key || `${authorId}-${new Date().toISOString().slice(0, 10)}`;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.processedKeys = staticData.processedKeys || {};\n\nconst now = Date.now();\nconst lastProcessedTime = staticData.processedKeys[idempotencyKey];\n\n// De-duplicate within a 3-minute sliding window\nconst isDuplicate = lastProcessedTime && (now - lastProcessedTime < 180000);\n\nif (!isDuplicate) {\n  staticData.processedKeys[idempotencyKey] = now;\n}\n\nreturn {\n  ...$json,\n  isDuplicate,\n  idempotencyKey,\n  authorId\n};"
+      },
+      "id": "4da12054-d860-4f64-bc6f-fb1f9d515794",
+      "name": "Idempotency & Deduplication Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5eb23165-e971-5075-cd70-0c20ae626805",
+      "name": "Check If Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"status\": \"Duplicate Skipped\",\n  \"message\": \"A royalty summary for this author was already initiated within the last 3 minutes.\",\n  \"author_id\": \"{{ $json.authorId }}\",\n  \"idempotency_key\": \"{{ $json.idempotencyKey }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "6fc34276-fa82-6186-de81-1d31bf737916",
+      "name": "Return Duplicate Notice",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1080,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Knowledge Base Grounding & Financial Metrics Aggregator\nconst body = $json.body || $json;\nconst author = body.author || body;\nconst books = author.books || [];\n\nlet totalSold = 0;\nlet totalEarned = 0;\nlet totalPaid = 0;\nlet totalPending = 0;\nlet hasOverdue = false;\n\nconst now = new Date();\nconst publishedBooks = [];\nconst inProductionBooks = [];\n\nfor (const b of books) {\n  if (b.status === 'Published & Live') {\n    totalSold += Number(b.total_copies_sold || 0);\n    totalEarned += Number(b.total_royalty_earned || 0);\n    totalPaid += Number(b.royalty_paid || 0);\n    totalPending += Number(b.royalty_pending || 0);\n\n    let isOverdue = false;\n    if (Number(b.royalty_pending || 0) > 0) {\n      if (b.last_royalty_payout_date) {\n        const daysSinceLast = (now - new Date(b.last_royalty_payout_date)) / (1000 * 3600 * 24);\n        if (daysSinceLast > 90) isOverdue = true;\n      } else if (b.publication_date) {\n        const daysSincePub = (now - new Date(b.publication_date)) / (1000 * 3600 * 24);\n        if (daysSincePub > 90) isOverdue = true;\n      }\n    }\n    if (isOverdue) hasOverdue = true;\n\n    publishedBooks.push({\n      title: b.title,\n      isbn: b.isbn || 'Assigned',\n      genre: b.genre,\n      copies_sold: b.total_copies_sold,\n      royalty_earned: b.total_royalty_earned,\n      royalty_paid: b.royalty_paid,\n      royalty_pending: b.royalty_pending,\n      status_badge: (b.royalty_pending === 0) ? 'Green' : (isOverdue ? 'Red' : 'Yellow'),\n      last_payout: b.last_royalty_payout_date || 'No Payout Yet'\n    });\n  } else {\n    inProductionBooks.push({\n      title: b.title,\n      stage: b.status.replace('In Production - ', '') || 'Production Pipeline'\n    });\n  }\n}\n\n// Quarterly Payout Calculation (45 days post quarter end)\nconst month = now.getMonth(); // 0-11\nlet upcomingQuarter = 'Q1';\nlet upcomingPayoutDate = 'May 15';\nif (month >= 3 && month <= 5) {\n  upcomingQuarter = 'Q2';\n  upcomingPayoutDate = 'August 15';\n} else if (month >= 6 && month <= 8) {\n  upcomingQuarter = 'Q3';\n  upcomingPayoutDate = 'November 15';\n} else if (month >= 9 && month <= 11) {\n  upcomingQuarter = 'Q4';\n  upcomingPayoutDate = 'February 15';\n}\n\nconst thresholdMet = totalPending >= 1000;\n\nreturn {\n  author_id: author.author_id,\n  name: author.name,\n  email: author.email,\n  city: author.city,\n  total_books: books.length,\n  total_copies_sold: totalSold,\n  total_royalty_earned: totalEarned,\n  total_royalty_paid: totalPaid,\n  total_royalty_pending: totalPending,\n  has_overdue: hasOverdue,\n  threshold_met: thresholdMet,\n  upcoming_quarter: upcomingQuarter,\n  upcoming_payout_date: upcomingPayoutDate,\n  published_books: publishedBooks,\n  in_production_books: inProductionBooks,\n  trigger_type: body.trigger_type || 'Manual Single',\n  idempotency_key: $json.idempotencyKey\n};"
+      },
+      "id": "7ad45387-0b93-7297-ef92-2e42cf848027",
+      "name": "Aggregate Metrics & Knowledge Base Policy Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY || 'sk-bookleaf-ai-key'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are BookLeaf Publishing's automated royalty communications specialist. Generate a warm, personalized, professional royalty summary email grounded strictly in company policies: 80% net author profit, quarterly calculation paid within 45 days (Q1: May 15, Q2: Aug 15, Q3: Nov 15, Q4: Feb 15), INR 1,000 minimum threshold with rollover for lower balances, and updates on in-production stages (Cover Design, Typesetting). Never hallucinate numbers.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Author: {{ $json.name }} ({{ $json.city }})\\nTotal Books: {{ $json.total_books }}\\nCopies Sold: {{ $json.total_copies_sold }}\\nTotal Earned: INR {{ $json.total_royalty_earned }}\\nTotal Paid: INR {{ $json.total_royalty_paid }}\\nPending Balance: INR {{ $json.total_royalty_pending }}\\nThreshold Met: {{ $json.threshold_met }}\\nHas Overdue: {{ $json.has_overdue }}\\nNext Scheduled Payout Date: {{ $json.upcoming_payout_date }}\\nPublished Books: {{ JSON.stringify($json.published_books) }}\\nIn-Production Books: {{ JSON.stringify($json.in_production_books) }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "8be56498-1ca4-83a8-fa03-3f53df959138",
+      "name": "Generate AI Royalty Summary (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        480
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Email Formatter & Resilient Fallback Engine\nconst prev = $('Aggregate Metrics & Knowledge Base Policy Engine').first().json;\nconst aiResponse = $json;\n\nlet emailBody = '';\nlet isAiGenerated = false;\n\nif (aiResponse?.choices?.[0]?.message?.content) {\n  emailBody = aiResponse.choices[0].message.content.trim();\n  isAiGenerated = true;\n} else {\n  // Deterministic Knowledge-Grounded Fallback Template\n  const bookBreakdown = prev.published_books.map(b => \n    `• \"${b.title}\" (ISBN: ${b.isbn}) | Genre: ${b.genre} | Sold: ${b.copies_sold} copies | Earned: ₹${b.royalty_earned.toLocaleString('en-IN')} | Paid: ₹${b.royalty_paid.toLocaleString('en-IN')} | Pending: ₹${b.royalty_pending.toLocaleString('en-IN')}`\n  ).join('\\n');\n\n  let productionNote = '';\n  if (prev.in_production_books && prev.in_production_books.length > 0) {\n    productionNote = '\\n\\n⏳ Books Currently in Production:\\n' + \n      prev.in_production_books.map(p => `• \"${p.title}\": Currently in ${p.stage}. Our production team is actively polishing your manuscript for release.`).join('\\n');\n  }\n\n  let payoutMessage = '';\n  if (prev.total_royalty_pending === 0) {\n    payoutMessage = '🎉 Congratulations! All accrued royalties for your titles are fully settled and paid up to date.';\n  } else if (prev.total_royalty_pending < 1000) {\n    payoutMessage = `💡 Note on Balance: Your pending balance is ₹${prev.total_royalty_pending.toLocaleString('en-IN')}. Per BookLeaf policy, royalties are disbursed once the ₹1,000 minimum threshold is reached. Your current balance will safely roll over to the next quarter.`;\n  } else {\n    payoutMessage = `📅 Payout Schedule: Your pending balance of ₹${prev.total_royalty_pending.toLocaleString('en-IN')} is scheduled for direct bank disbursement by ${prev.upcoming_payout_date} (within our quarterly 45-day window).`;\n  }\n\n  emailBody = `Subject: BookLeaf Publishing Royalty Summary — ${prev.name}\n\nDear ${prev.name},\n\nWe are delighted to share your latest publishing statement and royalty summary with BookLeaf Publishing.\n\n📊 Performance Summary Overview:\n• Total Published Books: ${prev.total_books}\n• Lifetime Copies Distributed: ${prev.total_copies_sold}\n• Total Royalty Accrued: ₹${prev.total_royalty_earned.toLocaleString('en-IN')}\n• Total Royalty Paid: ₹${prev.total_royalty_paid.toLocaleString('en-IN')}\n• Outstanding Pending Royalty: ₹${prev.total_royalty_pending.toLocaleString('en-IN')}\n\n📚 Detailed Book Performance:\n${bookBreakdown}${productionNote}\n\n${payoutMessage}\n\nThank you for sharing your voice with readers worldwide through BookLeaf Publishing. If you have any questions regarding your statement, feel free to reply directly or contact your Author Support Representative.\n\nWarm regards,\nAuthor Relations & Royalties Desk\nBookLeaf Publishing\nsupport@bookleafpublishing.com`;\n}\n\nreturn {\n  author_id: prev.author_id,\n  author_name: prev.name,\n  author_email: prev.email,\n  trigger_type: prev.trigger_type,\n  status: 'Success',\n  email_content: emailBody,\n  is_ai_generated: isAiGenerated,\n  sent_timestamp: new Date().toISOString(),\n  idempotency_key: prev.idempotency_key\n};"
+      },
+      "id": "9cf67509-2db5-94b9-0b14-4064ef06a249",
+      "name": "Format Email & Fallback Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BUBBLE_APP_URL || 'http://localhost:5002' }}/api/1.1/obj/notification_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.BUBBLE_API_TOKEN || 'bubble_sec_token_8829'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"author_id\": \"{{ $json.author_id }}\",\n  \"author_name\": \"{{ $json.author_name }}\",\n  \"author_email\": \"{{ $json.author_email }}\",\n  \"trigger_type\": \"{{ $json.trigger_type }}\",\n  \"status\": \"{{ $json.status }}\",\n  \"generated_email_content\": \"{{ $json.email_content.replace(/\"/g, '\\\\\"').replace(/\\n/g, '\\\\n') }}\",\n  \"sent_timestamp\": \"{{ $json.sent_timestamp }}\",\n  \"idempotency_key\": \"{{ $json.idempotency_key }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a0d7861a-3ec6-a5ca-1c25-5175f017b35a",
+      "name": "Bubble Data API Callback (Log Update)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        380
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "royalties@bookleafpublishing.com",
+        "toEmail": "={{ $json.author_email }}",
+        "subject": "=Your BookLeaf Royalty Summary & Catalog Update — {{ $json.author_name }}",
+        "emailType": "text",
+        "message": "={{ $json.email_content }}",
+        "options": {}
+      },
+      "id": "b1e8972b-4fd7-b6db-2d36-62860128c46b",
+      "name": "Send Email Node (Bonus SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1800,
+        560
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"status\": \"Success\",\n  \"author_id\": \"{{ $json.author_id }}\",\n  \"author_name\": \"{{ $json.author_name }}\",\n  \"author_email\": \"{{ $json.author_email }}\",\n  \"email_preview\": \"{{ $json.email_content.slice(0, 200).replace(/\\n/g, ' ') }}...\",\n  \"sent_timestamp\": \"{{ $json.sent_timestamp }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c2f9083c-50e8-c7ec-3e47-73971239d57c",
+      "name": "Return Success to Bubble UI",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2040,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Bubble Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Auth Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Auth Header": {
+      "main": [
+        [
+          {
+            "node": "Idempotency & Deduplication Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject 401 Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idempotency & Deduplication Check": {
+      "main": [
+        [
+          {
+            "node": "Check If Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Return Duplicate Notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Metrics & Knowledge Base Policy Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Metrics & Knowledge Base Policy Engine": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Royalty Summary (LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Royalty Summary (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Format Email & Fallback Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email & Fallback Handler": {
+      "main": [
+        [
+          {
+            "node": "Bubble Data API Callback (Log Update)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email Node (Bonus SMTP)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Success to Bubble UI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

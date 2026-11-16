@@ -1,22 +1,21 @@
 {
-  "name": "bookleaf-publishing-assessment",
+  "name": "bookleaf-assessment-workspace",
   "version": "1.0.0",
-  "description": "BookLeaf Publishing Author Support & Communication Portal",
+  "description": "BookLeaf Publishing Full-Stack Technical Assessments (Assignment 1 & Assignment 2)",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev.js",
-    "dev:backend": "node backend/src/server.js",
-    "dev:frontend": "npm run dev --prefix frontend",
-    "seed": "node backend/src/database/seed.js",
-    "db": "node scripts/query-db.js",
-    "test:ai": "node aiml/test-cases.js"
-  },
-  "dependencies": {
-    "@google/genai": "^2.31.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^18.0.9",
-    "express": "^5.3.0",
-    "jsonwebtoken": "^9.0.3"
+    "start": "echo 'Run npm run dev:assignment_1 or npm run dev:assignment_2'",
+    "dev:assignment1": "cd assignment_1 && npm run dev",
+    "dev:assignment_1": "cd assignment_1 && npm run dev",
+    "dev:assignment-1": "cd assignment_1 && npm run dev",
+    "dev:assignment2": "cd assignment_2/app && npm run dev",
+    "dev:assignment_2": "cd assignment_2/app && npm run dev",
+    "dev:assignment-2": "cd assignment_2/app && npm run dev",
+    "test:assignment1": "cd assignment_1 && npm run test:ai",
+    "test:assignment_1": "cd assignment_1 && npm run test:ai",
+    "test:assignment-1": "cd assignment_1 && npm run test:ai",
+    "test:assignment2": "cd assignment_2/app && npm test",
+    "test:assignment_2": "cd assignment_2/app && npm test",
+    "test:assignment-2": "cd assignment_2/app && npm test"
   }
 }
