@@ -4,7 +4,9 @@
   "description": "BookLeaf Publishing Full-Stack Technical Assessments (Assignment 1 & Assignment 2)",
   "type": "module",
   "scripts": {
+    "setup": "node scripts/setup.js",
     "start": "echo 'Run npm run dev:assignment_1 or npm run dev:assignment_2'",
+    "test:all": "node scripts/setup.js && npm run test:assignment_2",
     "dev:assignment1": "cd assignment_1 && npm run dev",
     "dev:assignment_1": "cd assignment_1 && npm run dev",
     "dev:assignment-1": "cd assignment_1 && npm run dev",

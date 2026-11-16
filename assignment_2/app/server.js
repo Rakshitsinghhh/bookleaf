@@ -346,7 +346,43 @@ app.post('/webhook/generate-royalty-summary', async (req, res) => {
   }
 
   try {
-    const generatedEmail = generateEmailContent(authorEnriched);
+    let generatedEmail = '';
+    let usedLiveN8n = false;
+
+    // Dispatch directly to live n8n instance if running
+    const n8nTarget = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/generate-royalty-summary';
+    try {
+      const n8nRes = await fetch(n8nTarget, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-bookleaf-api-key': EXPECTED_API_KEY
+        },
+        body: JSON.stringify({
+          author_id: authorEnriched.author_id,
+          name: authorEnriched.name,
+          email: authorEnriched.email,
+          city: authorEnriched.city,
+          trigger_type: trigger_type || 'Manual Single',
+          idempotency_key: key,
+          books: authorEnriched.books
+        }),
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (n8nRes.ok) {
+        const n8nData = await n8nRes.json();
+        console.log('⚡ Successfully executed via LIVE n8n workflow:', n8nData.status);
+        generatedEmail = n8nData.email_content || n8nData.email_preview || '';
+        usedLiveN8n = true;
+      }
+    } catch (n8nErr) {
+      console.log('ℹ️ n8n live bridge fallback to local engine:', n8nErr.message);
+    }
+
+    if (!generatedEmail) {
+      generatedEmail = generateEmailContent(authorEnriched);
+    }
 
     const logEntry = {
       log_id: `LOG-${Date.now()}`,
