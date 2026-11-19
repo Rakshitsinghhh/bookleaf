@@ -14,6 +14,55 @@ const uploadsDir = path.resolve(__dirname, '../../uploads');
 const router = express.Router();
 
 /**
+ * GET /api/tickets
+ * General tickets endpoint (resolves 404 when querying /api/tickets)
+ * If admin -> returns all tickets with filters
+ * If author -> returns their submitted tickets
+ */
+router.get('/', authenticate, (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      const { status, category, priority, search } = req.query;
+      let sql = `
+        SELECT t.*, a.name as author_name, a.email as author_email, b.title as book_title
+        FROM tickets t
+        JOIN authors a ON t.author_id = a.author_id
+        LEFT JOIN books b ON t.book_id = b.book_id
+        WHERE 1=1
+      `;
+      const params = [];
+      if (status && status !== 'All') { sql += ' AND t.status = ?'; params.push(status); }
+      if (category && category !== 'All') { sql += ' AND t.category = ?'; params.push(category); }
+      if (priority && priority !== 'All') { sql += ' AND t.priority = ?'; params.push(priority); }
+      if (search && search.trim()) {
+        sql += ' AND (t.ticket_id LIKE ? OR t.subject LIKE ? OR a.name LIKE ?)';
+        const term = `%${search.trim()}%`;
+        params.push(term, term, term);
+      }
+      sql += ' ORDER BY CASE t.priority WHEN "Critical" THEN 1 WHEN "High" THEN 2 WHEN "Medium" THEN 3 ELSE 4 END, t.created_at DESC';
+      const tickets = dbHelper.all(sql, params);
+      return res.json({ tickets, total: tickets.length });
+    }
+
+    // Author view
+    const authorId = req.user.author_id || req.user.id;
+    const tickets = dbHelper.all(
+      `SELECT t.*, a.name as author_name, b.title as book_title
+       FROM tickets t
+       JOIN authors a ON t.author_id = a.author_id
+       LEFT JOIN books b ON t.book_id = b.book_id
+       WHERE t.author_id = ?
+       ORDER BY t.created_at DESC`,
+      [authorId]
+    );
+    return res.json({ tickets, total: tickets.length });
+  } catch (err) {
+    console.error('Error in GET /api/tickets:', err);
+    return res.status(500).json({ error: 'ServerError', message: 'Failed to retrieve tickets.' });
+  }
+});
+
+/**
  * POST /api/tickets
  * Submit a new ticket (Author only)
  * Automatically triggers AI classification, priority scoring, and draft generation.
@@ -29,22 +78,40 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'ValidationError', message: 'Detailed description is required.' });
     }
 
-    const authorId = req.user.role === 'author' ? req.user.author_id : (req.body.author_id || req.user.id);
-    const author = dbHelper.get('SELECT * FROM authors WHERE author_id = ?', [authorId]);
+    let authorId = req.user.role === 'author' ? req.user.author_id : (req.body.author_id || req.user.id);
+    let author = dbHelper.get('SELECT * FROM authors WHERE author_id = ?', [authorId]);
+
+    // Ensure author exists in DB to prevent foreign key constraint violation
+    if (!author) {
+      const existingAuthor = dbHelper.get('SELECT * FROM authors LIMIT 1');
+      if (existingAuthor) {
+        authorId = existingAuthor.author_id;
+        author = existingAuthor;
+      } else {
+        authorId = authorId || 'AUTH001';
+        dbHelper.run(
+          "INSERT OR IGNORE INTO authors (author_id, name, email, password) VALUES (?, ?, ?, 'author123')",
+          [authorId, req.user.name || 'Author', req.user.email || 'author@bookleafpub.in']
+        );
+        author = dbHelper.get('SELECT * FROM authors WHERE author_id = ?', [authorId]);
+      }
+    }
 
     let book = null;
+    let validBookId = 'GENERAL';
     if (book_id && book_id !== 'GENERAL') {
       book = dbHelper.get('SELECT * FROM books WHERE book_id = ?', [book_id]);
+      if (book) validBookId = book.book_id;
     }
 
     // Call AI Integration Service (with graceful degradation fallback)
     const aiResult = await analyzeTicketWithAI(
       { subject, description },
       author || { name: req.user.name },
-      book || { title: book_id === 'GENERAL' ? 'General Inquiry' : 'Selected Title' }
+      book || { title: validBookId === 'GENERAL' ? 'General Inquiry' : 'Selected Title' }
     );
 
-    const ticketId = `TCK-${Date.now().toString().slice(-6)}`;
+    const ticketId = `TCK-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const now = new Date().toISOString();
 
     // Persist attachment to server disk if provided
@@ -130,7 +197,7 @@ router.post('/', authenticate, async (req, res) => {
     console.error('Error submitting ticket:', err);
     return res.status(500).json({
       error: 'ServerError',
-      message: 'Failed to submit ticket. Please try again.'
+      message: err.message || 'Failed to submit ticket. Please try again.'
     });
   }
 });

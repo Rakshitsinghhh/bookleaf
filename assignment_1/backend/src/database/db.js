@@ -20,10 +20,16 @@ db.exec('PRAGMA foreign_keys = ON;');
 
 // Initialize tables if they do not exist
 export function initSchema() {
-  const schemaPath = path.resolve(__dirname, '../../../database/schema.sql');
-  if (fs.existsSync(schemaPath)) {
-    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-    db.exec(schemaSql);
+  const schemaCandidates = [
+    path.resolve(__dirname, '../../database/schema.sql'),
+    path.resolve(__dirname, '../../../database/schema.sql'),
+  ];
+  for (const schemaPath of schemaCandidates) {
+    if (fs.existsSync(schemaPath)) {
+      const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+      db.exec(schemaSql);
+      break;
+    }
   }
 }
 

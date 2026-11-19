@@ -12,9 +12,20 @@ export function seedDatabase() {
   initSchema();
 
   // Load dataset
-  const dataPath = path.resolve(__dirname, '../../../database/bookleaf_sample_data.json');
-  if (!fs.existsSync(dataPath)) {
-    console.warn('Dataset file not found at:', dataPath);
+  const dataCandidates = [
+    path.resolve(__dirname, '../../database/bookleaf_sample_data.json'),
+    path.resolve(__dirname, '../../../database/bookleaf_sample_data.json'),
+  ];
+  let dataPath = null;
+  for (const p of dataCandidates) {
+    if (fs.existsSync(p)) {
+      dataPath = p;
+      break;
+    }
+  }
+
+  if (!dataPath) {
+    console.warn('Dataset file not found in candidates:', dataCandidates);
     return;
   }
 
