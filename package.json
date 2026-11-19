@@ -18,6 +18,8 @@
     "test:assignment-1": "cd assignment_1 && npm run test:ai",
     "test:assignment2": "cd assignment_2/app && npm test",
     "test:assignment_2": "cd assignment_2/app && npm test",
-    "test:assignment-2": "cd assignment_2/app && npm test"
+    "test:assignment-2": "cd assignment_2/app && npm test",
+    "test:n8n": "node assignment_2/test-n8n.js",
+    "test:tunnel": "node assignment_2/test-live-tunnel.js"
   }
 }

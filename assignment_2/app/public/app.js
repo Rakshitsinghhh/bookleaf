@@ -1,5 +1,6 @@
 // BookLeaf Publishing - Assignment 2 Interactive Application Logic
 document.addEventListener('DOMContentLoaded', () => {
+  const ROUTE_PREFIX = window.location.pathname.startsWith('/dashboard') ? '/dashboard' : '';
   let currentAuthorId = 'AUTH001';
   let activeAuthorData = null;
   let allAuthorsCache = [];
@@ -34,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----------------- AUTHOR PORTAL -----------------
   async function loadAuthorData(authorId) {
     try {
-      const res = await fetch(`/api/authors/${authorId}`);
+      const res = await fetch(`${ROUTE_PREFIX}/api/authors/${authorId}`);
       const data = await res.json();
       if (!data.success) return;
 
@@ -115,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const search = document.getElementById('admin-search-input').value;
 
     try {
-      const res = await fetch(`/api/authors?city=${encodeURIComponent(city)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`);
+      const res = await fetch(`${ROUTE_PREFIX}/api/authors?city=${encodeURIComponent(city)}&status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`);
       const data = await res.json();
       if (!data.success) return;
 
@@ -178,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load Notification Logs
   async function loadNotificationLogs() {
     try {
-      const res = await fetch('/api/notification-logs');
+      const res = await fetch(`${ROUTE_PREFIX}/api/notification-logs`);
       const data = await res.json();
       if (!data.success) return;
 
@@ -221,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedAuthorInModal = null;
 
   window.openAuthorDetailModal = async function(authorId) {
-    const res = await fetch(`/api/authors/${authorId}`);
+    const res = await fetch(`${ROUTE_PREFIX}/api/authors/${authorId}`);
     const data = await res.json();
     if (!data.success) return;
 
@@ -254,6 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('author-detail-modal').classList.add('open');
+    if (typeof checkN8nStatus === 'function') {
+      checkN8nStatus(false);
+    }
   };
 
   // Close modal
@@ -264,6 +268,82 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('author-detail-modal').classList.remove('open');
   });
 
+  // Save and load n8n configuration from localStorage
+  const n8nUrlInput = document.getElementById('n8n-endpoint-url');
+  const n8nModeSelect = document.getElementById('n8n-exec-mode');
+  const n8nPill = document.getElementById('n8n-live-pill');
+  const n8nStatusDetail = document.getElementById('n8n-status-detail');
+  const pingBtn = document.getElementById('btn-ping-n8n');
+
+  if (localStorage.getItem('bookleaf_n8n_url')) {
+    n8nUrlInput.value = localStorage.getItem('bookleaf_n8n_url');
+  }
+  if (localStorage.getItem('bookleaf_n8n_mode')) {
+    n8nModeSelect.value = localStorage.getItem('bookleaf_n8n_mode');
+  }
+
+  n8nUrlInput.addEventListener('change', () => {
+    localStorage.setItem('bookleaf_n8n_url', n8nUrlInput.value.trim());
+  });
+  n8nModeSelect.addEventListener('change', () => {
+    localStorage.setItem('bookleaf_n8n_mode', n8nModeSelect.value);
+  });
+
+  // Ping n8n Connection
+  async function checkN8nStatus(showToastFeedback = false) {
+    if (!pingBtn) return;
+    const url = n8nUrlInput.value.trim() || 'http://localhost:5678';
+    pingBtn.disabled = true;
+    pingBtn.textContent = 'Pinging...';
+    n8nStatusDetail.className = 'n8n-status-msg';
+    n8nStatusDetail.textContent = 'Testing connection to n8n webhook...';
+
+    try {
+      const res = await fetch(`${ROUTE_PREFIX}/api/n8n/ping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n8n_url: url })
+      });
+      const data = await res.json();
+
+      if (data.overall_status === 'production_active') {
+        n8nPill.className = 'badge badge-green';
+        n8nPill.textContent = '🟢 Production Active';
+        n8nStatusDetail.className = 'n8n-status-msg status-success';
+        n8nStatusDetail.innerHTML = `<strong>Connected!</strong> n8n is actively listening on production webhook. All executions will be logged in n8n.`;
+        if (showToastFeedback) showToast('🟢 n8n is Connected and Active!', 'success');
+      } else if (data.overall_status === 'test_mode_active') {
+        n8nPill.className = 'badge badge-yellow';
+        n8nPill.textContent = '🟡 Canvas Test Listening';
+        n8nStatusDetail.className = 'n8n-status-msg status-warning';
+        n8nStatusDetail.innerHTML = `<strong>Canvas Test Active!</strong> n8n is waiting for a test event. When triggered, nodes on canvas will turn green.`;
+        if (showToastFeedback) showToast('🟡 n8n Canvas Test Mode is listening!', 'info');
+      } else if (data.overall_status === 'workflow_inactive') {
+        n8nPill.className = 'badge badge-red';
+        n8nPill.textContent = '🔴 Workflow Inactive';
+        n8nStatusDetail.className = 'n8n-status-msg status-error';
+        n8nStatusDetail.innerHTML = `<strong>Workflow is Inactive (HTTP 404):</strong> In your n8n browser tab, flip the switch from <em>Inactive</em> to <strong>Active</strong> in the top-right, OR click <strong>Test workflow</strong> on the canvas!`;
+        if (showToastFeedback) showToast('⚠️ n8n workflow is Inactive! Flip toggle to Active in n8n.', 'error');
+      } else {
+        n8nPill.className = 'badge badge-red';
+        n8nPill.textContent = '🔴 Offline';
+        n8nStatusDetail.className = 'n8n-status-msg status-error';
+        n8nStatusDetail.innerHTML = `<strong>Cannot connect to ${url}:</strong> Ensure n8n is running. Start it with <code>npx n8n</code> in your terminal.`;
+        if (showToastFeedback) showToast('🔴 n8n is Offline. Start with npx n8n', 'error');
+      }
+    } catch (err) {
+      n8nPill.className = 'badge badge-red';
+      n8nPill.textContent = '🔴 Error';
+      n8nStatusDetail.className = 'n8n-status-msg status-error';
+      n8nStatusDetail.textContent = `Error testing connection: ${err.message}`;
+    } finally {
+      pingBtn.disabled = false;
+      pingBtn.textContent = '⚡ Ping n8n';
+    }
+  }
+
+  pingBtn.addEventListener('click', () => checkN8nStatus(true));
+
   // Trigger Royalty Summary via Webhook
   const triggerBtn = document.getElementById('modal-trigger-btn');
   triggerBtn.addEventListener('click', async () => {
@@ -271,14 +351,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const author = selectedAuthorInModal;
     const simulateError = document.getElementById('simulate-error-toggle').checked;
+    const n8nUrl = n8nUrlInput.value.trim() || 'http://localhost:5678';
+    const n8nMode = n8nModeSelect.value || 'auto';
 
     triggerBtn.classList.add('loading');
     triggerBtn.disabled = true;
 
-    showToast(`Calling n8n Webhook for ${author.name}...`, 'info');
+    showToast(`Dispatching Webhook for ${author.name}...`, 'info');
 
     try {
-      const response = await fetch('/webhook/generate-royalty-summary', {
+      const response = await fetch(`${ROUTE_PREFIX}/webhook/generate-royalty-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -288,7 +370,9 @@ document.addEventListener('DOMContentLoaded', () => {
           author_id: author.author_id,
           trigger_type: 'Manual Single',
           idempotency_key: `${author.author_id}-${Date.now()}`,
-          simulate_error: simulateError
+          simulate_error: simulateError,
+          n8n_url: n8nUrl,
+          n8n_mode: n8nMode
         })
       });
 
@@ -297,10 +381,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (resData.status === 'Duplicate Skipped') {
         showToast(`⚠️ Idempotency Notice: ${resData.message}`, 'error');
       } else if (resData.status === 'Success') {
-        const msg = resData.used_live_n8n 
-          ? `⚡ Success: Executed via LIVE n8n Pipeline & Dispatched to ${author.email}!` 
-          : `✅ Royalty Summary Generated & Dispatched to ${author.email}!`;
-        showToast(msg, 'success');
+        if (resData.used_live_n8n) {
+          const modeTag = resData.n8n_details?.successful_mode || 'Live';
+          showToast(`⚡ Success! Executed via LIVE n8n (${modeTag}) & Dispatched to ${author.email}!`, 'success');
+        } else {
+          showToast(`ℹ️ Dispatched to ${author.email} (Local Mock Engine: n8n was inactive or offline).`, 'info');
+        }
         document.getElementById('author-detail-modal').classList.remove('open');
         loadNotificationLogs();
         // Open preview
@@ -325,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('🚀 Initiating Bulk Royalty Summaries for all pending authors...', 'info');
 
     try {
-      const res = await fetch('/api/admin/bulk-trigger', { method: 'POST' });
+      const res = await fetch(`${ROUTE_PREFIX}/api/admin/bulk-trigger`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`✅ Bulk Completed: ${data.processed} author summaries processed & logged!`, 'success');
@@ -346,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let authorEmail = author ? author.email : 'author@email.com';
 
     if (!content) {
-      const logsRes = await fetch('/api/notification-logs');
+      const logsRes = await fetch(`${ROUTE_PREFIX}/api/notification-logs`);
       const logsData = await logsRes.json();
       const match = logsData.logs.find(l => l.log_id === logId);
       if (match) {

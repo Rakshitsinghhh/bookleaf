@@ -1094,3 +1094,69 @@ body {
 
 .mt-4 { margin-top: 1rem; }
 .mt-6 { margin-top: 1.5rem; }
+
+/* n8n Configuration & Status Bar */
+.n8n-config-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+}
+.n8n-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.n8n-inputs-grid {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.n8n-inputs-grid input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+.n8n-inputs-grid select {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+.n8n-status-msg {
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: #f1f5f9;
+  border-left: 3px solid #94a3b8;
+  line-height: 1.4;
+}
+.n8n-status-msg.status-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border-left-color: #10b981;
+}
+.n8n-status-msg.status-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border-left-color: #f59e0b;
+}
+.n8n-status-msg.status-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border-left-color: #ef4444;
+}
+

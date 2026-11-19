@@ -430,6 +430,33 @@ Content-Type: application/json
 }</code></pre>
           </div>
         </div>
+
+        <!-- Troubleshooting: Why Executions May Not Show -->
+        <div class="doc-card mt-6" style="border-left: 4px solid var(--primary-coral);">
+          <h3 class="doc-title" style="color: var(--primary-coral); display: flex; align-items: center; gap: 0.5rem;">
+            <span>⚠️</span> Why does "In execution nothing work" happen in n8n?
+          </h3>
+          <p class="doc-text">n8n operates in two distinct execution modes. If configured incorrectly, incoming requests return HTTP 404 and will <strong>NOT appear in the Executions tab</strong>:</p>
+          <div class="schema-tree mt-4">
+            <div class="schema-item">
+              <strong>1. Production / Active Mode (Required for the "Executions" tab)</strong>
+              <ul>
+                <li>Look at the top-right corner of your n8n canvas (next to "Save").</li>
+                <li>Flip the switch from <code>Inactive ◯──────</code> to <code>Active ──────◯</code>.</li>
+                <li>When Active, n8n listens 24/7 on <code>/webhook/generate-royalty-summary</code> and logs every trigger in <strong>Executions</strong> in the left sidebar!</li>
+              </ul>
+            </div>
+            <div class="schema-item">
+              <strong>2. Canvas Test Mode (To watch nodes turn green interactively)</strong>
+              <ul>
+                <li>Leave the switch on <strong>Inactive</strong>.</li>
+                <li>Click <strong>"Test workflow"</strong> at the bottom of the n8n canvas. n8n will say <em>"Waiting for webhook call..."</em>.</li>
+                <li>In this state, n8n only listens on <code>/webhook-test/generate-royalty-summary</code>.</li>
+                <li>Our companion app automatically detects this and routes requests to <code>/webhook-test/</code> so your canvas animates!</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -601,6 +628,26 @@ Content-Type: application/json
               <!-- Dynamically populated -->
             </tbody>
           </table>
+        </div>
+
+        <!-- n8n Live Bridge & Webhook Config -->
+        <div class="n8n-config-box">
+          <div class="n8n-config-header">
+            <span>📡 n8n Target & Webhook Execution Mode</span>
+            <span id="n8n-live-pill" class="badge badge-neutral">Status: Not Checked</span>
+          </div>
+          <div class="n8n-inputs-grid">
+            <input type="text" id="n8n-endpoint-url" placeholder="http://localhost:5678" value="http://localhost:5678" title="n8n Base URL or Tunnel URL" />
+            <select id="n8n-exec-mode" title="Execution Mode">
+              <option value="auto">Auto-Detect (Prod + Canvas)</option>
+              <option value="test">Canvas Test Mode (/webhook-test/)</option>
+              <option value="production">Production Mode (/webhook/)</option>
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-ping-n8n" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">⚡ Ping n8n</button>
+          </div>
+          <div id="n8n-status-detail" class="n8n-status-msg">
+            Click <strong>Ping n8n</strong> to test if n8n is running and check if the workflow is Active or in Canvas Test Mode.
+          </div>
         </div>
       </div>
 

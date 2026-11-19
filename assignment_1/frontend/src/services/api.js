@@ -1,4 +1,15 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+function getApiUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window === 'undefined') {
+    // In Server context (SSR / Server Actions), use Vercel service binding BACKEND_URL
+    if (process.env.BACKEND_URL) {
+      return `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`;
+    }
+    return 'http://localhost:5001/api';
+  }
+  // In Browser context on Vercel (rewritten to backend service) or relative
+  return '/api';
+}
 
 async function fetchWithAuth(endpoint, options = {}) {
   let token = null;
@@ -22,6 +33,7 @@ async function fetchWithAuth(endpoint, options = {}) {
     ...(options.headers || {})
   };
 
+  const API_URL = getApiUrl();
   let response;
   try {
     response = await fetch(`${API_URL}${endpoint}`, {

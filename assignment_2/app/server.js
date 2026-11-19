@@ -16,6 +16,18 @@ const EXPECTED_API_KEY = process.env.N8N_WEBHOOK_SECRET || 'bk_live_7f8a9e2d4c1b
 
 app.use(cors());
 app.use(express.json());
+
+// Support running both standalone (port 5002) and under Vercel multi-service (/dashboard prefix)
+app.use((req, res, next) => {
+  if (req.url.startsWith('/dashboard/')) {
+    req.url = req.url.replace('/dashboard', '');
+  } else if (req.url === '/dashboard') {
+    req.url = '/';
+  }
+  next();
+});
+
+app.use('/dashboard', express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Load dataset
@@ -349,35 +361,82 @@ app.post('/webhook/generate-royalty-summary', async (req, res) => {
     let generatedEmail = '';
     let usedLiveN8n = false;
 
-    // Dispatch directly to live n8n instance if running
-    const n8nTarget = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/generate-royalty-summary';
-    try {
-      const n8nRes = await fetch(n8nTarget, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-bookleaf-api-key': EXPECTED_API_KEY
-        },
-        body: JSON.stringify({
-          author_id: authorEnriched.author_id,
-          name: authorEnriched.name,
-          email: authorEnriched.email,
-          city: authorEnriched.city,
-          trigger_type: trigger_type || 'Manual Single',
-          idempotency_key: key,
-          books: authorEnriched.books
-        }),
-        signal: AbortSignal.timeout(5000)
-      });
+    // Determine target n8n endpoint and modes
+    const rawN8nInput = req.body.n8n_url || req.headers['x-n8n-url'] || process.env.N8N_BASE_URL || process.env.N8N_WEBHOOK_URL || 'http://localhost:5678';
+    let n8nBase = rawN8nInput.replace(/\/webhook(-test)?(\/generate-royalty-summary)?\/?$/, '').replace(/\/+$/, '');
+    if (!n8nBase.startsWith('http://') && !n8nBase.startsWith('https://')) {
+      n8nBase = `http://${n8nBase}`;
+    }
 
-      if (n8nRes.ok) {
-        const n8nData = await n8nRes.json();
-        console.log('⚡ Successfully executed via LIVE n8n workflow:', n8nData.status);
-        generatedEmail = n8nData.email_content || n8nData.email_preview || '';
-        usedLiveN8n = true;
+    const requestedMode = req.body.n8n_mode || 'auto'; // 'auto' | 'production' | 'test'
+    const endpointsToTry = [];
+
+    if (requestedMode === 'test') {
+      endpointsToTry.push({ url: `${n8nBase}/webhook-test/generate-royalty-summary`, mode: 'Canvas Test Mode (/webhook-test/)' });
+      endpointsToTry.push({ url: `${n8nBase}/webhook/generate-royalty-summary`, mode: 'Production Mode (/webhook/)' });
+    } else if (requestedMode === 'production') {
+      endpointsToTry.push({ url: `${n8nBase}/webhook/generate-royalty-summary`, mode: 'Production Mode (/webhook/)' });
+    } else {
+      // Auto-Detect: Try production first; if 404 (workflow inactive or waiting in test mode), automatically attempt test mode!
+      endpointsToTry.push({ url: `${n8nBase}/webhook/generate-royalty-summary`, mode: 'Production Mode (/webhook/)' });
+      endpointsToTry.push({ url: `${n8nBase}/webhook-test/generate-royalty-summary`, mode: 'Canvas Test Mode (/webhook-test/)' });
+    }
+
+    const n8nDetails = {
+      base_url: n8nBase,
+      requested_mode: requestedMode,
+      attempts: [],
+      successful_mode: null,
+      successful_url: null,
+      error: null
+    };
+
+    for (const target of endpointsToTry) {
+      try {
+        console.log(`📡 [n8n Bridge] Attempting ${target.mode} -> ${target.url}`);
+        const n8nRes = await fetch(target.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bookleaf-api-key': EXPECTED_API_KEY,
+            'Bypass-Tunnel-Reminder': 'true'
+          },
+          body: JSON.stringify({
+            author_id: authorEnriched.author_id,
+            author: authorEnriched,
+            name: authorEnriched.name,
+            email: authorEnriched.email,
+            city: authorEnriched.city,
+            trigger_type: trigger_type || 'Manual Single',
+            idempotency_key: key,
+            books: authorEnriched.books
+          }),
+          signal: AbortSignal.timeout(6000)
+        });
+
+        n8nDetails.attempts.push({ url: target.url, mode: target.mode, status: n8nRes.status });
+
+        if (n8nRes.ok) {
+          const n8nData = await n8nRes.json();
+          console.log(`⚡ [n8n Bridge] Successfully executed via LIVE n8n (${target.mode}):`, n8nData.status || 200);
+          generatedEmail = n8nData.email_content || n8nData.email_preview || '';
+          usedLiveN8n = true;
+          n8nDetails.successful_mode = target.mode;
+          n8nDetails.successful_url = target.url;
+          n8nDetails.response = n8nData;
+          break;
+        } else {
+          console.log(`ℹ️ [n8n Bridge] ${target.mode} returned HTTP ${n8nRes.status}`);
+        }
+      } catch (n8nErr) {
+        console.log(`⚠️ [n8n Bridge] ${target.mode} failed to connect:`, n8nErr.message);
+        n8nDetails.attempts.push({ url: target.url, mode: target.mode, error: n8nErr.message });
       }
-    } catch (n8nErr) {
-      console.log('ℹ️ n8n live bridge fallback to local engine:', n8nErr.message);
+    }
+
+    if (!usedLiveN8n) {
+      n8nDetails.error = `Could not connect to active n8n instance at ${n8nBase}`;
+      console.log('ℹ️ [n8n Bridge] Falling back to local template engine.');
     }
 
     if (!generatedEmail) {
@@ -408,7 +467,8 @@ app.post('/webhook/generate-royalty-summary', async (req, res) => {
       email_content: generatedEmail,
       sent_timestamp: logEntry.sent_timestamp,
       log_id: logEntry.log_id,
-      used_live_n8n: usedLiveN8n
+      used_live_n8n: usedLiveN8n,
+      n8n_details: n8nDetails
     });
   } catch (err) {
     console.error('Workflow error:', err);
@@ -467,6 +527,75 @@ app.post('/api/admin/bulk-trigger', async (req, res) => {
     processed: results.length,
     results
   });
+});
+
+// 7. Test / Ping n8n Connection Endpoint (Health Check & Diagnostics)
+app.post('/api/n8n/ping', async (req, res) => {
+  const rawUrl = req.body.n8n_url || req.headers['x-n8n-url'] || process.env.N8N_BASE_URL || 'http://localhost:5678';
+  let n8nBase = rawUrl.replace(/\/webhook(-test)?(\/generate-royalty-summary)?\/?$/, '').replace(/\/+$/, '');
+  if (!n8nBase.startsWith('http://') && !n8nBase.startsWith('https://')) {
+    n8nBase = `http://${n8nBase}`;
+  }
+
+  const results = {
+    base_url: n8nBase,
+    production: { url: `${n8nBase}/webhook/generate-royalty-summary`, available: false, status: null },
+    test_mode: { url: `${n8nBase}/webhook-test/generate-royalty-summary`, available: false, status: null },
+    overall_status: 'offline',
+    message: ''
+  };
+
+  // Test Production URL
+  try {
+    const prodRes = await fetch(`${n8nBase}/webhook/generate-royalty-summary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bookleaf-api-key': EXPECTED_API_KEY,
+        'Bypass-Tunnel-Reminder': 'true'
+      },
+      body: JSON.stringify({ ping: true, author_id: 'PING_CHECK' }),
+      signal: AbortSignal.timeout(3000)
+    });
+    results.production.status = prodRes.status;
+    results.production.available = (prodRes.status === 200 || prodRes.status === 400 || prodRes.status === 401);
+  } catch (err) {
+    results.production.error = err.message;
+  }
+
+  // Test Canvas Test Mode URL
+  try {
+    const testRes = await fetch(`${n8nBase}/webhook-test/generate-royalty-summary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bookleaf-api-key': EXPECTED_API_KEY,
+        'Bypass-Tunnel-Reminder': 'true'
+      },
+      body: JSON.stringify({ ping: true, author_id: 'PING_CHECK' }),
+      signal: AbortSignal.timeout(3000)
+    });
+    results.test_mode.status = testRes.status;
+    results.test_mode.available = (testRes.status === 200 || testRes.status === 400 || testRes.status === 401);
+  } catch (err) {
+    results.test_mode.error = err.message;
+  }
+
+  if (results.production.available) {
+    results.overall_status = 'production_active';
+    results.message = '🟢 Production Webhook is ACTIVE! n8n is actively listening 24/7.';
+  } else if (results.test_mode.available) {
+    results.overall_status = 'test_mode_active';
+    results.message = '🟡 n8n Canvas Test Mode is LISTENING! Ready to receive execution from canvas.';
+  } else if (results.production.status === 404 && results.test_mode.status === 404) {
+    results.overall_status = 'workflow_inactive';
+    results.message = '⚠️ n8n is running, but the workflow is INACTIVE (HTTP 404). In n8n, flip the toggle switch to "Active" (top right), or click "Test workflow" on the canvas.';
+  } else {
+    results.overall_status = 'offline';
+    results.message = `🔴 Could not connect to n8n at ${n8nBase}. Please start n8n with: npx n8n`;
+  }
+
+  res.json(results);
 });
 
 // Serve frontend SPA fallback

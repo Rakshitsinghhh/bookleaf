@@ -8,9 +8,15 @@ const RealtimeContext = createContext({
   lastEvent: null
 });
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL
-  ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '')
-  : 'http://localhost:5001';
+function getApiBase() {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return process.env.BACKEND_URL || 'http://localhost:5001';
+}
 
 export function RealtimeProvider({ children }) {
   const { user, role } = useAuth();
@@ -22,7 +28,8 @@ export function RealtimeProvider({ children }) {
     let reconnectTimeout = null;
 
     function connectSSE() {
-      const url = `${API_BASE}/api/realtime/stream?authorId=${user?.author_id || ''}&role=${role}`;
+      const apiBase = getApiBase();
+      const url = `${apiBase}/api/realtime/stream?authorId=${user?.author_id || ''}&role=${role}`;
       eventSource = new EventSource(url);
 
       eventSource.onopen = () => {

@@ -1,7 +1,8 @@
-// Test script to send sample author payload to the live n8n tunnel
+// Test script to send sample author payload to the live n8n instance or tunnel
 // Supports both Production URL (/webhook/) and Test URL (/webhook-test/)
 
-const BASE_TUNNEL = 'https://upset-zebras-sit.loca.lt';
+const rawTarget = process.argv[2] || process.env.N8N_URL || process.env.BASE_TUNNEL || 'http://localhost:5678';
+const BASE_TUNNEL = rawTarget.replace(/\/webhook(-test)?(\/generate-royalty-summary)?\/?$/, '').replace(/\/+$/, '');
 const API_KEY = 'bk_live_7f8a9e2d4c1b';
 
 const payload = {
